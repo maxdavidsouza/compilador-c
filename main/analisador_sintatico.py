@@ -12,14 +12,22 @@ class Parser:
 
     def comer(self, tipo_esperado):
         if self.token_atual.tipo == tipo_esperado:
-            # print(f"Consumindo token {self.token_atual}")
-            self.pos += 1
-            if self.pos < len(self.tokens):
-                self.token_atual = self.tokens[self.pos]
-            else:
-                self.token_atual = Token('EOF', '', self.token_atual.linha, self.token_atual.coluna)
+            self.avancar()
         else:
-            self.erro(f"Esperado '{tipo_esperado}', encontrado '{self.token_atual.tipo}'")
+            self.erro(f"Esperado token do tipo '{tipo_esperado}', encontrado '{self.token_atual.tipo}'")
+
+    def comer_simbolo(self, simbolo_esperado):
+        if self.token_atual.tipo == 'DELIM' and self.token_atual.valor == simbolo_esperado:
+            self.avancar()
+        else:
+            self.erro(f"Esperado símbolo '{simbolo_esperado}', encontrado '{self.token_atual.valor}'")
+
+    def avancar(self):
+        self.pos += 1
+        if self.pos < len(self.tokens):
+            self.token_atual = self.tokens[self.pos]
+        else:
+            self.token_atual = Token('EOF', '', self.token_atual.linha, self.token_atual.coluna)
 
     def analisar(self):
         self.programa()
@@ -27,135 +35,152 @@ class Parser:
             self.erro("Esperado EOF")
         print("Análise sintática concluída com sucesso!")
 
-    # Programa -> { DeclFunc }
     def programa(self):
         while self.token_atual.tipo in {'INT', 'FLOAT', 'CHAR', 'BOOL', 'VOID'}:
             self.decl()
-        if self.token_atual.tipo != 'EOF':
-            self.erro("Esperado EOF")
 
     def decl(self):
         tipo = self.token_atual.tipo
         self.comer(tipo)
 
         if self.token_atual.tipo == 'ID':
-            self.lista_ids()
-            if self.token_atual.tipo == 'DELIM' and self.token_atual.valor == ';':
-                self.comer('DELIM')
-            elif self.token_atual.tipo == 'DELIM' and self.token_atual.valor == '(':
-                # Caso seja função
-                self.comer('DELIM')  # '('
-                self.comer('DELIM')  # ')'
+            nome = self.token_atual.valor
+            self.comer('ID')
+            if self.token_atual.tipo == 'DELIM' and self.token_atual.valor == ',':
+                self.lista_ids_continua()
+                self.comer_simbolo(';')
+            elif self.token_atual.tipo == 'DELIM' and self.token_atual.valor == ';':
+                self.comer_simbolo(';')
+            elif self.token_atual.tipo == 'DELIM' and self.token_atual.valor == '(':  # é uma função
+                self.comer_simbolo('(')
+                if not (self.token_atual.tipo == 'DELIM' and self.token_atual.valor == ')'):
+                    self.parametros_formais()
+                self.comer_simbolo(')')
                 self.bloco()
             else:
-                self.erro("Esperado ';' ou '(' após identificadores")
+                self.erro(f"Esperado ';', ',' ou '(' após identificador '{nome}'")
         else:
             self.erro("Esperado identificador após tipo")
 
-    def lista_ids(self):
-        self.comer('ID')
+    def parametros_formais(self):
+        self.parametro()
         while self.token_atual.tipo == 'DELIM' and self.token_atual.valor == ',':
-            self.comer('DELIM')
+            self.comer_simbolo(',')
+            self.parametro()
+
+    def parametro(self):
+        if self.token_atual.tipo in {'INT', 'FLOAT', 'CHAR', 'BOOL'}:
+            self.comer(self.token_atual.tipo)
+            self.comer('ID')
+        else:
+            self.erro("Esperado tipo de parâmetro")
+
+    def lista_ids_continua(self):
+        while self.token_atual.tipo == 'DELIM' and self.token_atual.valor == ',':
+            self.comer_simbolo(',')
             self.comer('ID')
 
-    # DeclFunc -> Tipo ID '(' ')' Bloco
-    def decl_func(self):
-        self.tipo()
-        self.comer('ID')
-        self.comer('(')
-        self.comer(')')
-        self.bloco()
-
-    # Tipo -> INT | FLOAT | CHAR | BOOL | VOID
-    def tipo(self):
-        if self.token_atual.tipo in {'INT', 'FLOAT', 'CHAR', 'BOOL', 'VOID'}:
-            self.comer(self.token_atual.tipo)
-        else:
-            self.erro("Esperado tipo")
-
-    # Bloco -> '{' { Comando } '}'
     def bloco(self):
-        self.comer('{')
-        while self.token_atual.tipo in {'INT', 'FLOAT', 'CHAR', 'BOOL', 'ID', 'IF', 'WHILE', 'RETURN', '{'}:
+        self.comer_simbolo('{')
+        while self.token_atual.tipo in {'INT', 'FLOAT', 'CHAR', 'BOOL', 'ID', 'IF', 'WHILE', 'RETURN', 'DELIM'}:
+            if self.token_atual.tipo == 'DELIM' and self.token_atual.valor == '}':
+                break
             self.comando()
-        self.comer('}')
+        self.comer_simbolo('}')
 
-    # Comando -> DeclVar | Atrib | If | While | Return | Bloco
     def comando(self):
         if self.token_atual.tipo in {'INT', 'FLOAT', 'CHAR', 'BOOL'}:
             self.decl_var()
         elif self.token_atual.tipo == 'ID':
-            self.atribuicao()
+            proximo = self.tokens[self.pos + 1] if self.pos + 1 < len(self.tokens) else None
+            if proximo and proximo.tipo == 'ATRIB':
+                self.atribuicao()
+            elif proximo and proximo.tipo == 'DELIM' and proximo.valor == '(':
+                self.chamada_funcao()
+            else:
+                self.erro("Esperado '=' ou '(' após identificador")
         elif self.token_atual.tipo == 'IF':
             self.comando_if()
         elif self.token_atual.tipo == 'WHILE':
             self.comando_while()
+        elif self.token_atual.tipo == 'BREAK':
+            self.comer('BREAK')
+            self.comer_simbolo(';')
+        elif self.token_atual.tipo == 'CONTINUE':
+            self.comer('CONTINUE')
+            self.comer_simbolo(';')
         elif self.token_atual.tipo == 'RETURN':
             self.comando_return()
-        elif self.token_atual.tipo == '{':
+        elif self.token_atual.tipo == 'DELIM' and self.token_atual.valor == '{':
             self.bloco()
         else:
             self.erro("Comando inválido")
 
-    # DeclVar -> Tipo ID ';'
     def decl_var(self):
-        self.tipo()
+        tipo = self.token_atual.tipo
+        self.comer(tipo)
         self.comer('ID')
-        self.comer('DELIM')  # ponto e vírgula ';'
+        self.lista_ids_continua()
+        self.comer_simbolo(';')
 
-    # Atrib -> ID '=' Expressao ';'
     def atribuicao(self):
         self.comer('ID')
         self.comer('ATRIB')
         self.expressao()
-        self.comer('DELIM')
+        self.comer_simbolo(';')
 
-    # If -> 'if' '(' Expressao ')' Comando [ 'else' Comando ]
+    def chamada_funcao(self):
+        self.comer('ID')
+        self.comer_simbolo('(')
+        if not (self.token_atual.tipo == 'DELIM' and self.token_atual.valor == ')'):
+            self.lista_argumentos()
+        self.comer_simbolo(')')
+        self.comer_simbolo(';')
+
+    def lista_argumentos(self):
+        self.expressao()
+        while self.token_atual.tipo == 'DELIM' and self.token_atual.valor == ',':
+            self.comer_simbolo(',')
+            self.expressao()
+
     def comando_if(self):
         self.comer('IF')
-        self.comer('(')
+        self.comer_simbolo('(')
         self.expressao()
-        self.comer(')')
+        self.comer_simbolo(')')
         self.comando()
         if self.token_atual.tipo == 'ELSE':
             self.comer('ELSE')
             self.comando()
 
-    # While -> 'while' '(' Expressao ')' Comando
     def comando_while(self):
         self.comer('WHILE')
-        self.comer('(')
+        self.comer_simbolo('(')
         self.expressao()
-        self.comer(')')
+        self.comer_simbolo(')')
         self.comando()
 
-    # Return -> 'return' [Expressao] ';'
     def comando_return(self):
         self.comer('RETURN')
-        # return pode ter expressão ou não
-        if self.token_atual.tipo not in {'DELIM'}:
+        if self.token_atual.tipo != 'DELIM' or (self.token_atual.tipo == 'DELIM' and self.token_atual.valor != ';'):
             self.expressao()
-        self.comer('DELIM')
+        self.comer_simbolo(';')
 
-    # Expressao -> ExpressaoLogica
     def expressao(self):
         self.expressao_logica()
 
-    # ExpressaoLogica -> ExpressaoLogica '||' ExpressaoLogica2 | ExpressaoLogica2
     def expressao_logica(self):
         self.expressao_logica2()
         while self.token_atual.tipo == 'OP_LOG' and self.token_atual.valor == '||':
             self.comer('OP_LOG')
             self.expressao_logica2()
 
-    # ExpressaoLogica2 -> ExpressaoLogica3 { '&&' ExpressaoLogica3 }
     def expressao_logica2(self):
         self.expressao_logica3()
         while self.token_atual.tipo == 'OP_LOG' and self.token_atual.valor == '&&':
             self.comer('OP_LOG')
             self.expressao_logica3()
 
-    # ExpressaoLogica3 -> '!' ExpressaoLogica3 | ExpressaoRelacional
     def expressao_logica3(self):
         if self.token_atual.tipo == 'OP_LOG' and self.token_atual.valor == '!':
             self.comer('OP_LOG')
@@ -163,40 +188,43 @@ class Parser:
         else:
             self.expressao_relacional()
 
-    # ExpressaoRelacional -> ExpressaoAritmetica [ OP_REL ExpressaoAritmetica ]
     def expressao_relacional(self):
         self.expressao_aritmetica()
         if self.token_atual.tipo == 'OP_REL':
             self.comer('OP_REL')
             self.expressao_aritmetica()
 
-    # ExpressaoAritmetica -> Termo { ('+' | '-') Termo }
     def expressao_aritmetica(self):
         self.termo()
         while self.token_atual.tipo == 'OP_ARIT' and self.token_atual.valor in ('+', '-'):
             self.comer('OP_ARIT')
             self.termo()
 
-    # Termo -> Fator { ('*' | '/') Fator }
     def termo(self):
         self.fator()
         while self.token_atual.tipo == 'OP_ARIT' and self.token_atual.valor in ('*', '/'):
             self.comer('OP_ARIT')
             self.fator()
 
-    # Fator -> NUM_INT | ID | '(' Expressao ')'
     def fator(self):
         if self.token_atual.tipo == 'NUM_INT':
             self.comer('NUM_INT')
         elif self.token_atual.tipo == 'ID':
-            self.comer('ID')
-        elif self.token_atual.tipo == 'DELIM' and self.token_atual.valor == '(':
-            self.comer('DELIM')
-            self.expressao()
-            if self.token_atual.tipo == 'DELIM' and self.token_atual.valor == ')':
-                self.comer('DELIM')
+            proximo = self.tokens[self.pos + 1] if self.pos + 1 < len(self.tokens) else None
+            if proximo and proximo.tipo == 'DELIM' and proximo.valor == '(':
+                self.comer('ID')
+                self.comer_simbolo('(')
+                if not (self.token_atual.tipo == 'DELIM' and self.token_atual.valor == ')'):
+                    self.lista_argumentos()
+                self.comer_simbolo(')')
             else:
-                self.erro("Esperado ')'")
+                self.comer('ID')
+        elif self.token_atual.tipo in {'TRUE', 'FALSE'}:
+            self.comer(self.token_atual.tipo)
+        elif self.token_atual.tipo == 'DELIM' and self.token_atual.valor == '(':
+            self.comer_simbolo('(')
+            self.expressao()
+            self.comer_simbolo(')')
         else:
-            self.erro("Esperado número, identificador ou '('")
+            self.erro("Esperado número, identificador, chamada de função, true, false ou '('")
 
