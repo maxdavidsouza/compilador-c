@@ -46,6 +46,7 @@ int main() {
 import streamlit as st
 from analisador_lexico import Lexer
 from analisador_sintatico import Parser
+from analisador_sintatico_preditivo import PredictiveParser
 
 st.title("Analisador Léxico e Sintático para linguagem C simplificada")
 
@@ -59,12 +60,14 @@ if st.button("Analisar"):
         for t in tokens:
             st.write(t)
 
-        st.subheader("Análise sintática: ")
-        parser = Parser(lexer)
-        if parser.analisar() is None:
-            st.write("Análise sintática completa sem erros.")
-            parser.exportar_graphviz()
-            st.graphviz_chart(parser.gerar_dot_string())
+        st.subheader("Análise sintática (Top-Down com Backtracking)")
+        parser = Parser(lexer).analisar()
+        st.write("Análise sintática concluída com sucesso!")
+
+        st.subheader("Análisa sintática (Top-Down Preditiva)")
+        pparser = PredictiveParser(tokens)
+        pparser.parse()
+        st.write("Análise sintática concluída com sucesso!")
 
     except Exception as e:
         st.error(f"Erro: {e}")
