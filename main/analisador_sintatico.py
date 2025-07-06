@@ -51,7 +51,7 @@ class Parser:
                 self.comer_simbolo(';')
             elif self.token_atual.tipo == 'DELIM' and self.token_atual.valor == ';':
                 self.comer_simbolo(';')
-            elif self.token_atual.tipo == 'DELIM' and self.token_atual.valor == '(':  # é uma função
+            elif self.token_atual.tipo == 'DELIM' and self.token_atual.valor == '(':
                 self.comer_simbolo('(')
                 if not (self.token_atual.tipo == 'DELIM' and self.token_atual.valor == ')'):
                     self.parametros_formais()
@@ -101,6 +101,8 @@ class Parser:
             self.comando_if()
         elif self.token_atual.tipo == 'WHILE':
             self.comando_while()
+        elif self.token_atual.tipo == 'FOR':
+            self.comando_for()
         elif self.token_atual.tipo == 'RETURN':
             self.comando_return()
         elif self.token_atual.tipo == 'BREAK':
@@ -120,6 +122,32 @@ class Parser:
         self.comer('ID')
         self.lista_ids_continua()
         self.comer_simbolo(';')
+
+    # Versões para uso interno no 'for' (não consomem ';')
+    def decl_var_for(self):
+        tipo = self.token_atual.tipo
+        self.comer(tipo)
+        self.comer('ID')
+        # Agora permite inicialização: '=' expressao
+        if self.token_atual.tipo == 'ATRIB':
+            self.comer('ATRIB')
+            self.expressao()
+        self.lista_ids_continua_for()
+
+    def lista_ids_continua_for(self):
+        # Essa versão para for, não consome ';'
+        while self.token_atual.tipo == 'DELIM' and self.token_atual.valor == ',':
+            self.comer_simbolo(',')
+            self.comer('ID')
+            if self.token_atual.tipo == 'ATRIB':
+                self.comer('ATRIB')
+                self.expressao()
+
+    def atribuicao_for(self):
+        self.comer('ID')
+        self.comer('ATRIB')
+        self.expressao()
+        # Não come ';' aqui
 
     def atribuicao(self):
         self.comer('ID')
@@ -155,6 +183,33 @@ class Parser:
         self.comer('WHILE')
         self.comer_simbolo('(')
         self.expressao()
+        self.comer_simbolo(')')
+        self.comando()
+
+    def comando_for(self):
+        self.comer('FOR')
+        self.comer_simbolo('(')
+
+        # Inicialização: declaração com inicialização ou atribuição
+        if self.token_atual.tipo in {'INT', 'FLOAT', 'CHAR', 'BOOL'}:
+            self.decl_var_for()
+        elif self.token_atual.tipo == 'ID':
+            self.atribuicao_for()
+        else:
+            self.erro("Esperado declaração com inicialização ou atribuição na inicialização do for")
+
+        self.comer_simbolo(';')
+
+        # Condição
+        self.expressao()
+        self.comer_simbolo(';')
+
+        # Incremento
+        if self.token_atual.tipo == 'ID':
+            self.atribuicao_for()
+        else:
+            self.erro("Esperado atribuição no incremento do for")
+
         self.comer_simbolo(')')
         self.comando()
 
@@ -200,7 +255,7 @@ class Parser:
 
     def termo(self):
         self.fator()
-        while self.token_atual.tipo == 'OP_ARIT' and self.token_atual.valor in ('*', '/'):
+        while self.token_atual.tipo == 'OP_ARIT' and self.token_atual.valor in ('*', '/', '%'):
             self.comer('OP_ARIT')
             self.fator()
 
