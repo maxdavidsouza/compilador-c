@@ -82,9 +82,7 @@ class Parser:
 
     def bloco(self):
         self.comer_simbolo('{')
-        while self.token_atual.tipo in {'INT', 'FLOAT', 'CHAR', 'BOOL', 'ID', 'IF', 'WHILE', 'RETURN', 'DELIM'}:
-            if self.token_atual.tipo == 'DELIM' and self.token_atual.valor == '}':
-                break
+        while not (self.token_atual.tipo == 'DELIM' and self.token_atual.valor == '}'):
             self.comando()
         self.comer_simbolo('}')
 
@@ -103,14 +101,14 @@ class Parser:
             self.comando_if()
         elif self.token_atual.tipo == 'WHILE':
             self.comando_while()
+        elif self.token_atual.tipo == 'RETURN':
+            self.comando_return()
         elif self.token_atual.tipo == 'BREAK':
             self.comer('BREAK')
             self.comer_simbolo(';')
         elif self.token_atual.tipo == 'CONTINUE':
             self.comer('CONTINUE')
             self.comer_simbolo(';')
-        elif self.token_atual.tipo == 'RETURN':
-            self.comando_return()
         elif self.token_atual.tipo == 'DELIM' and self.token_atual.valor == '{':
             self.bloco()
         else:
@@ -227,4 +225,3 @@ class Parser:
             self.comer_simbolo(')')
         else:
             self.erro("Esperado número, identificador, chamada de função, true, false ou '('")
-

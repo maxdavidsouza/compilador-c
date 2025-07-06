@@ -1,23 +1,46 @@
-entrada = '''int x, y;
+# Entrada de teste que engloba todos os aspectos da
+# linguagem para o analisador sintático
+entrada = '''int global_var;
 bool flag;
 
-int soma(int a, int b) {
-    int resultado;
-    resultado = a + b;
-    return resultado;
+void procedimentoSemParametro() {
+    int x;
+    x = 5;
+    print(x);
+    return;
+}
+
+int funcaoComParametro(int p) {
+    if (p > 0) {
+        return p * 2;
+    } else {
+        return 0;
+    }
 }
 
 int main() {
-    x = 10;
-    y = 20;
+    int a, b;
+    bool c;
+
+    a = 10;
+    b = funcaoComParametro(a);
     flag = true;
-    if (x < y) {
-        printf(x);
-    } else {
-        printf(y);
+
+    while (flag) {
+        if (b == 20) {
+            print(b);
+            break;
+        } else {
+            b = b - 1;
+            continue;
+        }
     }
-        return 0;
-    }
+
+    procedimentoSemParametro();
+    print(global_var);
+
+    return 0;
+}
 '''
 
 import streamlit as st

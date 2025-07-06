@@ -20,7 +20,7 @@ class Lexer:
         self.erros = []
 
         self.palavras_reservadas = {
-            'int', 'float', 'if', 'else', 'while', 'for', 'break', 'return', 'void', 'char', 'bool', 'true', 'false'
+            'int', 'float', 'if', 'else', 'while', 'for', 'break', 'continue', 'return', 'void', 'char', 'bool', 'true', 'false'
         }
 
         self.regex_tokens = [
