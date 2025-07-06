@@ -60,9 +60,11 @@ if st.button("Analisar"):
             st.write(t)
 
         st.subheader("Análise sintática: ")
-        parser = Parser(lexer).analisar()
-        if parser is None:
+        parser = Parser(lexer)
+        if parser.analisar() is None:
             st.write("Análise sintática completa sem erros.")
+            parser.exportar_graphviz()
+            st.graphviz_chart(parser.gerar_dot_string())
 
     except Exception as e:
         st.error(f"Erro: {e}")

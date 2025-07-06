@@ -7,6 +7,38 @@ class Parser:
         self.pos = 0
         self.token_atual = self.tokens[self.pos]
 
+        # Grafo de rastreabilidade
+        self.node_id = 0
+        self.nodes = []
+        self.edges = []
+        self.parent_stack = []
+
+    def novo_no(self, label):
+        self.node_id += 1
+        no_atual = self.node_id
+        self.nodes.append((no_atual, label))
+        if self.parent_stack:
+            pai = self.parent_stack[-1]
+            self.edges.append((pai, no_atual))
+        return no_atual
+
+    def rastrear(label):
+        """
+        Decorador de função para rastrear chamadas em métodos do Parser.
+        """
+
+        def decorator(func):
+            def wrapper(self, *args, **kwargs):
+                no_atual = self.novo_no(label)
+                self.parent_stack.append(no_atual)
+                resultado = func(self, *args, **kwargs)
+                self.parent_stack.pop()
+                return resultado
+
+            return wrapper
+
+        return decorator
+
     def erro(self, msg="Erro sintático"):
         raise Exception(f"{msg} em linha {self.token_atual.linha}, coluna {self.token_atual.coluna}")
 
@@ -29,16 +61,19 @@ class Parser:
         else:
             self.token_atual = Token('EOF', '', self.token_atual.linha, self.token_atual.coluna)
 
+    @rastrear("analisar")
     def analisar(self):
         self.programa()
         if self.token_atual.tipo != 'EOF':
             self.erro("Esperado EOF")
         print("Análise sintática concluída com sucesso!")
 
+    @rastrear("programa")
     def programa(self):
         while self.token_atual.tipo in {'INT', 'FLOAT', 'CHAR', 'BOOL', 'VOID'}:
             self.decl()
 
+    @rastrear("declaração de variável")
     def decl(self):
         tipo = self.token_atual.tipo
         self.comer(tipo)
@@ -62,12 +97,14 @@ class Parser:
         else:
             self.erro("Esperado identificador após tipo")
 
+    @rastrear("parametros_formais")
     def parametros_formais(self):
         self.parametro()
         while self.token_atual.tipo == 'DELIM' and self.token_atual.valor == ',':
             self.comer_simbolo(',')
             self.parametro()
 
+    @rastrear("parametro")
     def parametro(self):
         if self.token_atual.tipo in {'INT', 'FLOAT', 'CHAR', 'BOOL'}:
             self.comer(self.token_atual.tipo)
@@ -75,17 +112,20 @@ class Parser:
         else:
             self.erro("Esperado tipo de parâmetro")
 
+    @rastrear("lista_ids_continua")
     def lista_ids_continua(self):
         while self.token_atual.tipo == 'DELIM' and self.token_atual.valor == ',':
             self.comer_simbolo(',')
             self.comer('ID')
 
+    @rastrear("bloco")
     def bloco(self):
         self.comer_simbolo('{')
         while not (self.token_atual.tipo == 'DELIM' and self.token_atual.valor == '}'):
             self.comando()
         self.comer_simbolo('}')
 
+    @rastrear("comando")
     def comando(self):
         if self.token_atual.tipo in {'INT', 'FLOAT', 'CHAR', 'BOOL'}:
             self.decl_var()
@@ -116,6 +156,7 @@ class Parser:
         else:
             self.erro("Comando inválido")
 
+    @rastrear("decl_var")
     def decl_var(self):
         tipo = self.token_atual.tipo
         self.comer(tipo)
@@ -124,6 +165,7 @@ class Parser:
         self.comer_simbolo(';')
 
     # Versões para uso interno no 'for' (não consomem ';')
+    @rastrear("decl_var_for")
     def decl_var_for(self):
         tipo = self.token_atual.tipo
         self.comer(tipo)
@@ -134,6 +176,7 @@ class Parser:
             self.expressao()
         self.lista_ids_continua_for()
 
+    @rastrear("lista_ids_continua_for")
     def lista_ids_continua_for(self):
         # Essa versão para for, não consome ';'
         while self.token_atual.tipo == 'DELIM' and self.token_atual.valor == ',':
@@ -143,18 +186,21 @@ class Parser:
                 self.comer('ATRIB')
                 self.expressao()
 
+    @rastrear("atribuicao_for")
     def atribuicao_for(self):
         self.comer('ID')
         self.comer('ATRIB')
         self.expressao()
         # Não come ';' aqui
 
+    @rastrear("atribuicao")
     def atribuicao(self):
         self.comer('ID')
         self.comer('ATRIB')
         self.expressao()
         self.comer_simbolo(';')
 
+    @rastrear("chamada_funcao")
     def chamada_funcao(self):
         self.comer('ID')
         self.comer_simbolo('(')
@@ -163,12 +209,14 @@ class Parser:
         self.comer_simbolo(')')
         self.comer_simbolo(';')
 
+    @rastrear("lista_argumentos")
     def lista_argumentos(self):
         self.expressao()
         while self.token_atual.tipo == 'DELIM' and self.token_atual.valor == ',':
             self.comer_simbolo(',')
             self.expressao()
 
+    @rastrear("comando_if")
     def comando_if(self):
         self.comer('IF')
         self.comer_simbolo('(')
@@ -179,6 +227,7 @@ class Parser:
             self.comer('ELSE')
             self.comando()
 
+    @rastrear("comando_while")
     def comando_while(self):
         self.comer('WHILE')
         self.comer_simbolo('(')
@@ -186,6 +235,7 @@ class Parser:
         self.comer_simbolo(')')
         self.comando()
 
+    @rastrear("comando_for")
     def comando_for(self):
         self.comer('FOR')
         self.comer_simbolo('(')
@@ -213,12 +263,14 @@ class Parser:
         self.comer_simbolo(')')
         self.comando()
 
+    @rastrear("comando_return")
     def comando_return(self):
         self.comer('RETURN')
         if self.token_atual.tipo != 'DELIM' or (self.token_atual.tipo == 'DELIM' and self.token_atual.valor != ';'):
             self.expressao()
         self.comer_simbolo(';')
 
+    @rastrear("expressao")
     def expressao(self):
         self.expressao_logica()
 
@@ -241,24 +293,28 @@ class Parser:
         else:
             self.expressao_relacional()
 
+    @rastrear("expressao_relacional")
     def expressao_relacional(self):
         self.expressao_aritmetica()
         if self.token_atual.tipo == 'OP_REL':
             self.comer('OP_REL')
             self.expressao_aritmetica()
 
+    @rastrear("expressao_aritmetica")
     def expressao_aritmetica(self):
         self.termo()
         while self.token_atual.tipo == 'OP_ARIT' and self.token_atual.valor in ('+', '-'):
             self.comer('OP_ARIT')
             self.termo()
 
+    @rastrear("termo da expressão")
     def termo(self):
         self.fator()
         while self.token_atual.tipo == 'OP_ARIT' and self.token_atual.valor in ('*', '/', '%'):
             self.comer('OP_ARIT')
             self.fator()
 
+    @rastrear("fator da expressão")
     def fator(self):
         if self.token_atual.tipo == 'NUM_INT':
             self.comer('NUM_INT')
@@ -280,3 +336,28 @@ class Parser:
             self.comer_simbolo(')')
         else:
             self.erro("Esperado número, identificador, chamada de função, true, false ou '('")
+
+    def exportar_graphviz(self, nome_arquivo="grafo_parser.dot"):
+        with open(nome_arquivo, "w", encoding="utf-8") as f:
+            f.write("digraph ParserTrace {\n")
+            f.write("  node [shape=box, style=filled, fillcolor=lightblue];\n")
+            for node_id, label in self.nodes:
+                label_esc = label.replace('"', '\\"')
+                f.write(f'  {node_id} [label="{label_esc}"];\n')
+            for from_id, to_id in self.edges:
+                f.write(f'  {from_id} -> {to_id};\n')
+            f.write("}\n")
+        print(f"Grafo exportado para {nome_arquivo}")
+
+    def gerar_dot_string(self):
+        linhas = [
+            "digraph ParserTrace {",
+            "  node [shape=box, style=filled, fillcolor=lightblue];"
+        ]
+        for node_id, label in self.nodes:
+            label_esc = label.replace('"', '\\"')
+            linhas.append(f'  {node_id} [label="{label_esc}"];')
+        for from_id, to_id in self.edges:
+            linhas.append(f'  {from_id} -> {to_id};')
+        linhas.append("}")
+        return "\n".join(linhas)
