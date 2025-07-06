@@ -95,7 +95,7 @@ class Parser:
             self.erro(f"Esperado ';', ',' ou '(' após identificador")
 
     # <tipo> ::= int | float | char | bool | void
-    @rastrear(lambda self: f"<{self.token.tipo}, {self.token.valor}>")
+    @rastrear(lambda self: f"Tipo: <{self.token.tipo}>")
     def tipo(self):
         if self.token.tipo in {'INT', 'FLOAT', 'CHAR', 'BOOL', 'VOID'}:
             self.match(self.token.tipo)
@@ -177,7 +177,7 @@ class Parser:
         self.match('DELIM', ';')
 
     # <atribuicao> ::= ID = <expressao> ;
-    @rastrear("atribuicao")
+    @rastrear(lambda self: f" atribuição: <{self.token.tipo}, {self.token.valor}>")
     def atribuicao(self):
         self.match('ID')
         self.match('ATRIB', '=')
@@ -185,7 +185,7 @@ class Parser:
         self.match('DELIM', ';')
 
     # <chamada_funcao> ::= ID ( [ <lista_argumentos> ] ) ;
-    @rastrear("chamada_funcao")
+    @rastrear("chamada de função")
     def chamada_funcao(self):
         self.match('ID')
         self.match('DELIM', '(')
@@ -195,7 +195,7 @@ class Parser:
         self.match('DELIM', ';')
 
     # <lista_argumentos> ::= <expressao> { , <expressao> }
-    @rastrear("lista_argumentos")
+    @rastrear("lista de argumentos")
     def lista_argumentos(self):
         self.expressao()
         while self.token.tipo == 'DELIM' and self.token.valor == ',':
@@ -203,7 +203,7 @@ class Parser:
             self.expressao()
 
     # <comando_if> ::= if ( <expressao> ) <comando> [ else <comando> ]
-    @rastrear("comando_if")
+    @rastrear("comando 'if'")
     def comando_if(self):
         self.match('IF')
         self.match('DELIM', '(')
@@ -215,7 +215,7 @@ class Parser:
             self.comando()
 
     # <comando_while> ::= while ( <expressao> ) <comando>
-    @rastrear("comando_while")
+    @rastrear("comando 'while'")
     def comando_while(self):
         self.match('WHILE')
         self.match('DELIM', '(')
@@ -224,7 +224,7 @@ class Parser:
         self.comando()
 
     # <comando_for> ::= for ( <for_inicializacao> ; <expressao> ; <for_incremento> ) <comando>
-    @rastrear("comando_for")
+    @rastrear("comando 'for'")
     def comando_for(self):
         self.match('FOR')
         self.match('DELIM', '(')
@@ -237,7 +237,7 @@ class Parser:
         self.comando()
 
     # <for_inicializacao> ::= <decl_var_for> | <atribuicao_for>
-    @rastrear("for_inicializacao")
+    @rastrear("inicialização de 'for'")
     def for_inicializacao(self):
         if self.token.tipo in {'INT', 'FLOAT', 'CHAR', 'BOOL'}:
             self.decl_var_for()
@@ -247,7 +247,7 @@ class Parser:
             self.erro("Esperado declaração com inicialização ou atribuição na inicialização do for")
 
     # <decl_var_for> ::= <tipo> ID [ = <expressao> ] { , ID [ = <expressao> ] }
-    @rastrear("decl_var_for")
+    @rastrear("declaração de variáveis no 'for'")
     def decl_var_for(self):
         self.tipo()
         self.match('ID')
@@ -262,21 +262,21 @@ class Parser:
                 self.expressao()
 
     # <atribuicao_for> ::= ID = <expressao>
-    @rastrear("atribuicao_for")
+    @rastrear("atribuição de valores no 'for'")
     def atribuicao_for(self):
         self.match('ID')
         self.match('ATRIB', '=')
         self.expressao()
 
     # <for_incremento> ::= ID = <expressao>
-    @rastrear("for_incremento")
+    @rastrear("incremento do 'for'")
     def for_incremento(self):
         self.match('ID')
         self.match('ATRIB', '=')
         self.expressao()
 
     # <comando_return> ::= return [ <expressao> ] ;
-    @rastrear("comando_return")
+    @rastrear("comando 'return'")
     def comando_return(self):
         self.match('RETURN')
         if not (self.token.tipo == 'DELIM' and self.token.valor == ';'):
@@ -359,6 +359,8 @@ class Parser:
     def fator(self):
         if self.token.tipo == 'NUM_INT':
             self.match('NUM_INT')
+        elif self.token.tipo == 'STRING':
+            self.match('STRING')
         elif self.token.tipo == 'ID':
             prox = self.tokens[self.pos + 1] if self.pos + 1 < len(self.tokens) else None
             if prox and prox.tipo == 'DELIM' and prox.valor == '(':
@@ -376,7 +378,7 @@ class Parser:
             self.expressao()
             self.match('DELIM', ')')
         else:
-            self.erro("Esperado número, identificador, chamada de função, true, false ou '('")
+            self.erro("Esperado número, string, identificador, chamada de função, true, false ou '('")
 
     def gerar_dot_string(self):
         linhas = [

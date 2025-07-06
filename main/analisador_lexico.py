@@ -20,10 +20,12 @@ class Lexer:
         self.erros = []
 
         self.palavras_reservadas = {
-            'int', 'float', 'if', 'else', 'while', 'for', 'break', 'continue', 'return', 'void', 'char', 'bool', 'true', 'false'
+            'int', 'float', 'if', 'else', 'while', 'for', 'break', 'continue', 'return', 'void',
+            'char', 'bool', 'true', 'false'
         }
 
         self.regex_tokens = [
+            ('STRING', r'"[^"\n]*"'),
             ('NUM_INT', r'\d+'),
             ('ID', r'[a-zA-Z_][a-zA-Z0-9_]*'),
             ('OP_REL', r'==|!=|<=|>=|<|>'),
