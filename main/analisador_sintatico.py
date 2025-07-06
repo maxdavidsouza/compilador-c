@@ -1,11 +1,10 @@
-from analisador_lexico import Lexer, Token
+from analisador_lexico import Token
 
 class Parser:
-    def __init__(self, lexer: Lexer):
-        self.lexer = lexer
-        self.tokens = lexer.analisar()
+    def __init__(self, tokens):
+        self.tokens = tokens
         self.pos = 0
-        self.token_atual = self.tokens[self.pos]
+        self.token = self.tokens[self.pos]
 
         # Grafo de rastreabilidade
         self.node_id = 0
@@ -22,319 +21,362 @@ class Parser:
             self.edges.append((pai, no_atual))
         return no_atual
 
-    def rastrear(label):
+    def rastrear(label_func):
         def decorator(func):
             def wrapper(self, *args, **kwargs):
+                # Avalia o label no momento da chamada
+                label = label_func(self) if callable(label_func) else label_func
                 no_atual = self.novo_no(label)
                 self.parent_stack.append(no_atual)
                 resultado = func(self, *args, **kwargs)
                 self.parent_stack.pop()
                 return resultado
+
             return wrapper
+
         return decorator
 
-    def erro(self, msg="Erro sintático"):
-        raise Exception(f"{msg} em linha {self.token_atual.linha}, coluna {self.token_atual.coluna}")
-
-    def ler(self, tipo_esperado):
-        if self.token_atual.tipo == tipo_esperado:
-            self.avancar()
-        else:
-            self.erro(f"Esperado token do tipo '{tipo_esperado}', encontrado '{self.token_atual.tipo}'")
-
-    def ler_simbolo(self, simbolo_esperado):
-        if self.token_atual.tipo == 'DELIM' and self.token_atual.valor == simbolo_esperado:
-            self.avancar()
-        else:
-            self.erro(f"Esperado símbolo '{simbolo_esperado}', encontrado '{self.token_atual.valor}'")
-
-    def avancar(self):
+    def avanca(self):
         self.pos += 1
         if self.pos < len(self.tokens):
-            self.token_atual = self.tokens[self.pos]
+            self.token = self.tokens[self.pos]
         else:
-            self.token_atual = Token('EOF', '', self.token_atual.linha, self.token_atual.coluna)
+            self.token = Token('EOF', '', -1, -1)
 
-    @rastrear("analisar")
+    def erro(self, msg):
+        raise Exception(f"Erro de sintaxe em token {self.token}. {msg}")
+
+    def match(self, tipo_esperado, valor_esperado=None):
+        if self.token.tipo == tipo_esperado:
+            if valor_esperado is None or self.token.valor == valor_esperado:
+                self.avanca()
+            else:
+                self.erro(f"Esperado token do tipo {tipo_esperado} com valor '{valor_esperado}', encontrado valor '{self.token.valor}'")
+        else:
+            self.erro(f"Esperado token do tipo {tipo_esperado}, encontrado {self.token.tipo}")
+
     def analisar(self):
         self.programa()
-        if self.token_atual.tipo != 'EOF':
-            self.erro("Esperado EOF")
-        print("Análise sintática concluída com sucesso!")
+        if self.token.tipo != 'EOF':
+            self.erro("Esperado EOF no final")
 
+    # <programa> ::= { <declaracao> }
     @rastrear("programa")
     def programa(self):
-        while self.token_atual.tipo in {'INT', 'FLOAT', 'CHAR', 'BOOL', 'VOID'}:
-            self.decl()
+        while self.token.tipo in {'INT', 'FLOAT', 'CHAR', 'BOOL', 'VOID'}:
+            self.declaracao()
 
-    @rastrear("declaração de variável")
-    def decl(self):
-        tipo = self.token_atual.tipo
-        self.ler(tipo)
+    # <declaracao> ::= <tipo> ID <decl_continua>
+    @rastrear("declaracao")
+    def declaracao(self):
+        self.tipo()
+        self.match('ID')
+        self.decl_continua()
 
-        if self.token_atual.tipo == 'ID':
-            nome = self.token_atual.valor
-            self.ler('ID')
-            if self.token_atual.tipo == 'DELIM' and self.token_atual.valor == ',':
-                self.lista_ids_continua()
-                self.ler_simbolo(';')
-            elif self.token_atual.tipo == 'DELIM' and self.token_atual.valor == ';':
-                self.ler_simbolo(';')
-            elif self.token_atual.tipo == 'DELIM' and self.token_atual.valor == '(':
-                self.ler_simbolo('(')
-                if not (self.token_atual.tipo == 'DELIM' and self.token_atual.valor == ')'):
-                    self.parametros_formais()
-                self.ler_simbolo(')')
-                self.bloco()
-            else:
-                self.erro(f"Esperado ';', ',' ou '(' após identificador '{nome}'")
+    # <decl_continua> ::= ;
+    #                  | , ID { , ID } ;
+    #                  | ( [ <parametros_formais> ] ) <bloco>
+    @rastrear("decl_continua")
+    def decl_continua(self):
+        if self.token.tipo == 'DELIM' and self.token.valor == ';':
+            self.match('DELIM', ';')
+        elif self.token.tipo == 'DELIM' and self.token.valor == ',':
+            while self.token.tipo == 'DELIM' and self.token.valor == ',':
+                self.match('DELIM', ',')
+                self.match('ID')
+            self.match('DELIM', ';')
+        elif self.token.tipo == 'DELIM' and self.token.valor == '(':
+            self.match('DELIM', '(')
+            if not (self.token.tipo == 'DELIM' and self.token.valor == ')'):
+                self.parametros_formais()
+            self.match('DELIM', ')')
+            self.bloco()
         else:
-            self.erro("Esperado identificador após tipo")
+            self.erro(f"Esperado ';', ',' ou '(' após identificador")
 
-    @rastrear("parametros_formais")
+    # <tipo> ::= int | float | char | bool | void
+    @rastrear(lambda self: f"<{self.token.tipo}, {self.token.valor}>")
+    def tipo(self):
+        if self.token.tipo in {'INT', 'FLOAT', 'CHAR', 'BOOL', 'VOID'}:
+            self.match(self.token.tipo)
+        else:
+            self.erro("Esperado tipo")
+
+    # <parametros_formais> ::= <parametro> { , <parametro> }
+    @rastrear("parametros_de_funcao")
     def parametros_formais(self):
         self.parametro()
-        while self.token_atual.tipo == 'DELIM' and self.token_atual.valor == ',':
-            self.ler_simbolo(',')
+        while self.token.tipo == 'DELIM' and self.token.valor == ',':
+            self.match('DELIM', ',')
             self.parametro()
 
+    # <parametro> ::= <tipo> ID
     @rastrear("parametro")
     def parametro(self):
-        if self.token_atual.tipo in {'INT', 'FLOAT', 'CHAR', 'BOOL'}:
-            self.ler(self.token_atual.tipo)
-            self.ler('ID')
-        else:
-            self.erro("Esperado tipo de parâmetro")
+        self.tipo()
+        self.match('ID')
 
-    @rastrear("lista_ids_continua")
-    def lista_ids_continua(self):
-        while self.token_atual.tipo == 'DELIM' and self.token_atual.valor == ',':
-            self.ler_simbolo(',')
-            self.ler('ID')
-
-    @rastrear("bloco")
+    # <bloco> ::= { { <comando> } }
+    @rastrear("bloco de função")
     def bloco(self):
-        self.ler_simbolo('{')
-        while not (self.token_atual.tipo == 'DELIM' and self.token_atual.valor == '}'):
+        self.match('DELIM', '{')
+        while not (self.token.tipo == 'DELIM' and self.token.valor == '}'):
             self.comando()
-        self.ler_simbolo('}')
+        self.match('DELIM', '}')
 
+    # <comando> ::= <decl_var>
+    #             | <atribuicao>
+    #             | <chamada_funcao>
+    #             | <comando_if>
+    #             | <comando_while>
+    #             | <comando_for>
+    #             | <comando_return>
+    #             | break ;
+    #             | continue ;
+    #             | <bloco>
     @rastrear("comando")
     def comando(self):
-        if self.token_atual.tipo in {'INT', 'FLOAT', 'CHAR', 'BOOL'}:
+        if self.token.tipo in {'INT', 'FLOAT', 'CHAR', 'BOOL'}:
             self.decl_var()
-        elif self.token_atual.tipo == 'ID':
-            proximo = self.tokens[self.pos + 1] if self.pos + 1 < len(self.tokens) else None
-            if proximo and proximo.tipo == 'ATRIB':
+        elif self.token.tipo == 'ID':
+            # lookahead para decidir atribuição ou chamada de função
+            prox = self.tokens[self.pos + 1] if self.pos + 1 < len(self.tokens) else None
+            if prox and prox.tipo == 'ATRIB':
                 self.atribuicao()
-            elif proximo and proximo.tipo == 'DELIM' and proximo.valor == '(':
+            elif prox and prox.tipo == 'DELIM' and prox.valor == '(':
                 self.chamada_funcao()
             else:
                 self.erro("Esperado '=' ou '(' após identificador")
-        elif self.token_atual.tipo == 'IF':
+        elif self.token.tipo == 'IF':
             self.comando_if()
-        elif self.token_atual.tipo == 'WHILE':
+        elif self.token.tipo == 'WHILE':
             self.comando_while()
-        elif self.token_atual.tipo == 'FOR':
+        elif self.token.tipo == 'FOR':
             self.comando_for()
-        elif self.token_atual.tipo == 'RETURN':
+        elif self.token.tipo == 'RETURN':
             self.comando_return()
-        elif self.token_atual.tipo == 'BREAK':
-            self.ler('BREAK')
-            self.ler_simbolo(';')
-        elif self.token_atual.tipo == 'CONTINUE':
-            self.ler('CONTINUE')
-            self.ler_simbolo(';')
-        elif self.token_atual.tipo == 'DELIM' and self.token_atual.valor == '{':
+        elif self.token.tipo == 'BREAK':
+            self.match('BREAK')
+            self.match('DELIM', ';')
+        elif self.token.tipo == 'CONTINUE':
+            self.match('CONTINUE')
+            self.match('DELIM', ';')
+        elif self.token.tipo == 'DELIM' and self.token.valor == '{':
             self.bloco()
         else:
             self.erro("Comando inválido")
 
+    # <decl_var> ::= <tipo> ID { , ID } ;
     @rastrear("decl_var")
     def decl_var(self):
-        tipo = self.token_atual.tipo
-        self.ler(tipo)
-        self.ler('ID')
-        self.lista_ids_continua()
-        self.ler_simbolo(';')
+        self.tipo()
+        self.match('ID')
+        while self.token.tipo == 'DELIM' and self.token.valor == ',':
+            self.match('DELIM', ',')
+            self.match('ID')
+        self.match('DELIM', ';')
 
-    @rastrear("decl_var_for")
-    def decl_var_for(self):
-        tipo = self.token_atual.tipo
-        self.ler(tipo)
-        self.ler('ID')
-        if self.token_atual.tipo == 'ATRIB':
-            self.ler('ATRIB')
-            self.expressao()
-        self.lista_ids_continua_for()
-
-    @rastrear("lista_ids_continua_for")
-    def lista_ids_continua_for(self):
-        while self.token_atual.tipo == 'DELIM' and self.token_atual.valor == ',':
-            self.ler_simbolo(',')
-            self.ler('ID')
-            if self.token_atual.tipo == 'ATRIB':
-                self.ler('ATRIB')
-                self.expressao()
-
-    @rastrear("atribuicao_for")
-    def atribuicao_for(self):
-        self.ler('ID')
-        self.ler('ATRIB')
-        self.expressao()
-
+    # <atribuicao> ::= ID = <expressao> ;
     @rastrear("atribuicao")
     def atribuicao(self):
-        self.ler('ID')
-        self.ler('ATRIB')
+        self.match('ID')
+        self.match('ATRIB', '=')
         self.expressao()
-        self.ler_simbolo(';')
+        self.match('DELIM', ';')
 
+    # <chamada_funcao> ::= ID ( [ <lista_argumentos> ] ) ;
     @rastrear("chamada_funcao")
     def chamada_funcao(self):
-        self.ler('ID')
-        self.ler_simbolo('(')
-        if not (self.token_atual.tipo == 'DELIM' and self.token_atual.valor == ')'):
+        self.match('ID')
+        self.match('DELIM', '(')
+        if not (self.token.tipo == 'DELIM' and self.token.valor == ')'):
             self.lista_argumentos()
-        self.ler_simbolo(')')
-        self.ler_simbolo(';')
+        self.match('DELIM', ')')
+        self.match('DELIM', ';')
 
+    # <lista_argumentos> ::= <expressao> { , <expressao> }
     @rastrear("lista_argumentos")
     def lista_argumentos(self):
         self.expressao()
-        while self.token_atual.tipo == 'DELIM' and self.token_atual.valor == ',':
-            self.ler_simbolo(',')
+        while self.token.tipo == 'DELIM' and self.token.valor == ',':
+            self.match('DELIM', ',')
             self.expressao()
 
+    # <comando_if> ::= if ( <expressao> ) <comando> [ else <comando> ]
     @rastrear("comando_if")
     def comando_if(self):
-        self.ler('IF')
-        self.ler_simbolo('(')
+        self.match('IF')
+        self.match('DELIM', '(')
         self.expressao()
-        self.ler_simbolo(')')
+        self.match('DELIM', ')')
         self.comando()
-        if self.token_atual.tipo == 'ELSE':
-            self.ler('ELSE')
+        if self.token.tipo == 'ELSE':
+            self.match('ELSE')
             self.comando()
 
+    # <comando_while> ::= while ( <expressao> ) <comando>
     @rastrear("comando_while")
     def comando_while(self):
-        self.ler('WHILE')
-        self.ler_simbolo('(')
+        self.match('WHILE')
+        self.match('DELIM', '(')
         self.expressao()
-        self.ler_simbolo(')')
+        self.match('DELIM', ')')
         self.comando()
 
+    # <comando_for> ::= for ( <for_inicializacao> ; <expressao> ; <for_incremento> ) <comando>
     @rastrear("comando_for")
     def comando_for(self):
-        self.ler('FOR')
-        self.ler_simbolo('(')
+        self.match('FOR')
+        self.match('DELIM', '(')
+        self.for_inicializacao()
+        self.match('DELIM', ';')
+        self.expressao()
+        self.match('DELIM', ';')
+        self.for_incremento()
+        self.match('DELIM', ')')
+        self.comando()
 
-        if self.token_atual.tipo in {'INT', 'FLOAT', 'CHAR', 'BOOL'}:
+    # <for_inicializacao> ::= <decl_var_for> | <atribuicao_for>
+    @rastrear("for_inicializacao")
+    def for_inicializacao(self):
+        if self.token.tipo in {'INT', 'FLOAT', 'CHAR', 'BOOL'}:
             self.decl_var_for()
-        elif self.token_atual.tipo == 'ID':
+        elif self.token.tipo == 'ID':
             self.atribuicao_for()
         else:
             self.erro("Esperado declaração com inicialização ou atribuição na inicialização do for")
 
-        self.ler_simbolo(';')
+    # <decl_var_for> ::= <tipo> ID [ = <expressao> ] { , ID [ = <expressao> ] }
+    @rastrear("decl_var_for")
+    def decl_var_for(self):
+        self.tipo()
+        self.match('ID')
+        if self.token.tipo == 'ATRIB':
+            self.match('ATRIB', '=')
+            self.expressao()
+        while self.token.tipo == 'DELIM' and self.token.valor == ',':
+            self.match('DELIM', ',')
+            self.match('ID')
+            if self.token.tipo == 'ATRIB':
+                self.match('ATRIB', '=')
+                self.expressao()
 
+    # <atribuicao_for> ::= ID = <expressao>
+    @rastrear("atribuicao_for")
+    def atribuicao_for(self):
+        self.match('ID')
+        self.match('ATRIB', '=')
         self.expressao()
-        self.ler_simbolo(';')
 
-        if self.token_atual.tipo == 'ID':
-            self.atribuicao_for()
-        else:
-            self.erro("Esperado atribuição no incremento do for")
+    # <for_incremento> ::= ID = <expressao>
+    @rastrear("for_incremento")
+    def for_incremento(self):
+        self.match('ID')
+        self.match('ATRIB', '=')
+        self.expressao()
 
-        self.ler_simbolo(')')
-        self.comando()
-
+    # <comando_return> ::= return [ <expressao> ] ;
     @rastrear("comando_return")
     def comando_return(self):
-        self.ler('RETURN')
-        if self.token_atual.tipo != 'DELIM' or (self.token_atual.tipo == 'DELIM' and self.token_atual.valor != ';'):
+        self.match('RETURN')
+        if not (self.token.tipo == 'DELIM' and self.token.valor == ';'):
             self.expressao()
-        self.ler_simbolo(';')
+        self.match('DELIM', ';')
 
+    # <expressao> ::= <expressao_logica>
     @rastrear("expressao")
     def expressao(self):
         self.expressao_logica()
 
+    # <expressao_logica> ::= <expressao_logica2> { || <expressao_logica2> }
     def expressao_logica(self):
         self.expressao_logica2()
-        while self.token_atual.tipo == 'OP_LOG' and self.token_atual.valor == '||':
-            self.ler('OP_LOG')
+        while self.token.tipo == 'OP_LOG' and self.token.valor == '||':
+            self.match('OP_LOG', '||')
             self.expressao_logica2()
 
+    # <expressao_logica2> ::= <expressao_logica3> { && <expressao_logica3> }
     def expressao_logica2(self):
         self.expressao_logica3()
-        while self.token_atual.tipo == 'OP_LOG' and self.token_atual.valor == '&&':
-            self.ler('OP_LOG')
+        while self.token.tipo == 'OP_LOG' and self.token.valor == '&&':
+            self.match('OP_LOG', '&&')
             self.expressao_logica3()
 
+    # <expressao_logica3> ::= [ ! ] <expressao_relacional>
     def expressao_logica3(self):
-        if self.token_atual.tipo == 'OP_LOG' and self.token_atual.valor == '!':
-            self.ler('OP_LOG')
+        if self.token.tipo == 'OP_LOG' and self.token.valor == '!':
+            self.match('OP_LOG', '!')
             self.expressao_logica3()
         else:
             self.expressao_relacional()
 
+    # <expressao_relacional> ::= <expressao_aritmetica> [ <op_relacional> <expressao_aritmetica> ]
     @rastrear("expressao_relacional")
     def expressao_relacional(self):
         self.expressao_aritmetica()
-        if self.token_atual.tipo == 'OP_REL':
-            self.ler('OP_REL')
+        if self.token.tipo == 'OP_REL':
+            self.op_relacional()
             self.expressao_aritmetica()
 
+    # <op_relacional> ::= == | != | <= | >= | < | >
+    @rastrear(lambda self: f"operador relacional: {self.token.valor}")
+    def op_relacional(self):
+        if self.token.valor in {'==', '!=', '<=', '>=', '<', '>'}:
+            self.match('OP_REL', self.token.valor)
+        else:
+            self.erro("Operador relacional inválido")
+
+    # <expressao_aritmetica> ::= <termo> { ( + | - ) <termo> }
     @rastrear("expressao_aritmetica")
     def expressao_aritmetica(self):
         self.termo()
-        while self.token_atual.tipo == 'OP_ARIT' and self.token_atual.valor in ('+', '-'):
-            self.ler('OP_ARIT')
+        while self.token.tipo == 'OP_ARIT' and self.token.valor in ('+', '-'):
+            self.op_aritmetico()
             self.termo()
 
-    @rastrear("termo da expressão")
+    # <termo> ::= <fator> { ( * | / | % ) <fator> }
+    @rastrear("termo")
     def termo(self):
         self.fator()
-        while self.token_atual.tipo == 'OP_ARIT' and self.token_atual.valor in ('*', '/', '%'):
-            self.ler('OP_ARIT')
+        while self.token.tipo == 'OP_ARIT' and self.token.valor in ('*', '/', '%'):
+            self.op_aritmetico()
             self.fator()
 
-    @rastrear("fator da expressão")
+    # <op_aritmetico> ::= + | - | * | / | %
+    @rastrear(lambda self: f"operador aritmético: <{self.token.tipo}, {self.token.valor}>")
+    def op_aritmetico(self):
+        if self.token.valor in {'+', '-', '*', '/', '%'}:
+            self.match('OP_ARIT', self.token.valor)
+        else:
+            self.erro("Operador aritmético inválido")
+
+    # <fator> ::= NUM_INT
+    #           | ID [ ( [ <lista_argumentos> ] ) ]
+    #           | true
+    #           | false
+    #           | ( <expressao> )
+    @rastrear(lambda self: f"fator: <{self.token.tipo}, {self.token.valor}>")
     def fator(self):
-        if self.token_atual.tipo == 'NUM_INT':
-            self.ler('NUM_INT')
-        elif self.token_atual.tipo == 'ID':
-            proximo = self.tokens[self.pos + 1] if self.pos + 1 < len(self.tokens) else None
-            if proximo and proximo.tipo == 'DELIM' and proximo.valor == '(':
-                self.ler('ID')
-                self.ler_simbolo('(')
-                if not (self.token_atual.tipo == 'DELIM' and self.token_atual.valor == ')'):
+        if self.token.tipo == 'NUM_INT':
+            self.match('NUM_INT')
+        elif self.token.tipo == 'ID':
+            prox = self.tokens[self.pos + 1] if self.pos + 1 < len(self.tokens) else None
+            if prox and prox.tipo == 'DELIM' and prox.valor == '(':
+                self.match('ID')
+                self.match('DELIM', '(')
+                if not (self.token.tipo == 'DELIM' and self.token.valor == ')'):
                     self.lista_argumentos()
-                self.ler_simbolo(')')
+                self.match('DELIM', ')')
             else:
-                self.ler('ID')
-        elif self.token_atual.tipo in {'TRUE', 'FALSE'}:
-            self.ler(self.token_atual.tipo)
-        elif self.token_atual.tipo == 'DELIM' and self.token_atual.valor == '(':
-            self.ler_simbolo('(')
+                self.match('ID')
+        elif self.token.tipo in {'TRUE', 'FALSE'}:
+            self.match(self.token.tipo)
+        elif self.token.tipo == 'DELIM' and self.token.valor == '(':
+            self.match('DELIM', '(')
             self.expressao()
-            self.ler_simbolo(')')
+            self.match('DELIM', ')')
         else:
             self.erro("Esperado número, identificador, chamada de função, true, false ou '('")
-
-    def exportar_graphviz(self, nome_arquivo="grafo_parser.dot"):
-        with open(nome_arquivo, "w", encoding="utf-8") as f:
-            f.write("digraph ParserTrace {\n")
-            f.write("  node [shape=box, style=filled, fillcolor=lightblue];\n")
-            for node_id, label in self.nodes:
-                label_esc = label.replace('"', '\\"')
-                f.write(f'  {node_id} [label="{label_esc}"];\n')
-            for from_id, to_id in self.edges:
-                f.write(f'  {from_id} -> {to_id};\n')
-            f.write("}\n")
-        print(f"Grafo exportado para {nome_arquivo}")
 
     def gerar_dot_string(self):
         linhas = [
