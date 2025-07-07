@@ -48,6 +48,7 @@ class Parser:
 
     def match(self, tipo_esperado, valor_esperado=None):
         if self.token.tipo == tipo_esperado:
+            self.novo_no(f"<{self.token.tipo}, {self.token.valor}>")
             if valor_esperado is None or self.token.valor == valor_esperado:
                 self.avanca()
             else:
@@ -95,7 +96,6 @@ class Parser:
             self.erro(f"Esperado ';', ',' ou '(' após identificador")
 
     # <tipo> ::= int | float | char | bool | void
-    @rastrear(lambda self: f"Tipo: <{self.token.tipo}>")
     def tipo(self):
         if self.token.tipo in {'INT', 'FLOAT', 'CHAR', 'BOOL', 'VOID'}:
             self.match(self.token.tipo)
@@ -177,7 +177,7 @@ class Parser:
         self.match('DELIM', ';')
 
     # <atribuicao> ::= ID = <expressao> ;
-    @rastrear(lambda self: f" atribuição: <{self.token.tipo}, {self.token.valor}>")
+    @rastrear("atribuição")
     def atribuicao(self):
         self.match('ID')
         self.match('ATRIB', '=')
@@ -319,7 +319,6 @@ class Parser:
             self.expressao_aritmetica()
 
     # <op_relacional> ::= == | != | <= | >= | < | >
-    @rastrear(lambda self: f"operador relacional: {self.token.valor}")
     def op_relacional(self):
         if self.token.valor in {'==', '!=', '<=', '>=', '<', '>'}:
             self.match('OP_REL', self.token.valor)
@@ -343,7 +342,6 @@ class Parser:
             self.fator()
 
     # <op_aritmetico> ::= + | - | * | / | %
-    @rastrear(lambda self: f"operador aritmético: <{self.token.tipo}, {self.token.valor}>")
     def op_aritmetico(self):
         if self.token.valor in {'+', '-', '*', '/', '%'}:
             self.match('OP_ARIT', self.token.valor)
@@ -355,7 +353,6 @@ class Parser:
     #           | true
     #           | false
     #           | ( <expressao> )
-    @rastrear(lambda self: f"fator: <{self.token.tipo}, {self.token.valor}>")
     def fator(self):
         if self.token.tipo == 'NUM_INT':
             self.match('NUM_INT')

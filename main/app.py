@@ -1,5 +1,7 @@
 # Entrada de teste que engloba todos os aspectos da
 # linguagem para o analisador sintático
+#import graphviz
+
 entrada = '''int global_var;
 bool flag;
 
@@ -64,6 +66,12 @@ if st.button("Analisar"):
         parser.analisar()
         st.write("Análise sintática concluída com sucesso!")
         st.graphviz_chart(parser.gerar_dot_string())
+
+        # Caso utilizemos exportação de grafo (talvez seja necessário
+        # fazer a instalação do app Graphviz no PATH do seu sistema operacional)
+        #dot_str = parser.gerar_dot_string()
+        #grafo = graphviz.Source(dot_str)
+        #grafo.render('grafo_gerado', format='png', cleanup=True)
 
     except Exception as e:
         st.error(f"Erro: {e}")
