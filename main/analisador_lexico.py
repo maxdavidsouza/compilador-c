@@ -25,6 +25,7 @@ class Lexer:
         }
 
         self.regex_tokens = [
+            ('COMENT', r'//.*'),
             ('STRING', r'"[^"\n]*"'),
             ('NUM_INT', r'\d+'),
             ('ID', r'[a-zA-Z_][a-zA-Z0-9_]*'),
@@ -35,7 +36,6 @@ class Lexer:
             ('DELIM', r'[;,\(\)\{\}]'),
             ('ESPACO', r'[ \t]+'),
             ('NOVA_LINHA', r'\n'),
-            ('COMENT', r'//.*'),
         ]
 
         self.regex_geral = '|'.join(f'(?P<{nome}>{padrao})' for nome, padrao in self.regex_tokens)
