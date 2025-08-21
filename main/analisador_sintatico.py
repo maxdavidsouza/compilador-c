@@ -94,11 +94,17 @@ class Parser:
             self.match('DELIM', '(')
             escopo_anterior = self.escopo_atual
             self.escopo_atual = id_token.valor
+            self.tipo_funcao_atual = tipo
+            self.return_encontrado = False
             if not (self.token.tipo == 'DELIM' and self.token.valor == ')'):
                 self.parametros_formais()
             self.match('DELIM', ')')
             self.bloco()
+            if self.tipo_funcao_atual != 'void' and not self.return_encontrado:
+                self.erro(f"Função '{self.escopo_atual}' do tipo {self.tipo_funcao_atual} deve ter um return")
             self.escopo_atual = escopo_anterior
+            self.tipo_funcao_atual = None
+            self.return_encontrado = False
         else:
             self.erro(f"Esperado ';', ',' ou '(' após identificador")
 
@@ -277,10 +283,27 @@ class Parser:
 
     @rastrear("comando 'return'")
     def comando_return(self):
+        funcao_atual = self.escopo_atual
+        tipo_funcao = self.tipo_funcao_atual
+
         self.match('RETURN')
-        if not (self.token.tipo == 'DELIM' and self.token.valor == ';'):
+
+        if tipo_funcao == 'void':
+            if not (self.token.tipo == 'DELIM' and self.token.valor == ';'):
+                self.erro(f"Função void '{funcao_atual}' não deve retornar valor")
+            self.match('DELIM', ';')
+        else:
+            if self.token.tipo == 'DELIM' and self.token.valor == ';':
+                self.erro(f"Função '{funcao_atual}' do tipo {tipo_funcao} deve retornar um valor")
             self.expressao()
-        self.match('DELIM', ';')
+            self.match('DELIM', ';')
+            self.return_encontrado = True
+
+    def obter_tipo_funcao(self, nome_funcao):
+        for entrada in self.tabela_simbolos:
+            if entrada['identificador'] == nome_funcao:
+                return entrada['tipo']
+        return None
 
     @rastrear("expressao")
     def expressao(self):
