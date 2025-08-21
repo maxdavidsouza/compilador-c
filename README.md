@@ -191,5 +191,6 @@ streamlit run app.py
 
 ![image](https://github.com/user-attachments/assets/2c4747b3-77f9-4f66-845b-25fb63a4df19)
 ![image](https://github.com/user-attachments/assets/9166ec76-03f4-4252-9f4e-f1e4d71a5068)
+<img width="543" height="662" alt="image" src="https://github.com/user-attachments/assets/c1c2d07c-261f-4038-9617-0f605e9597d7" />
 ![image](https://github.com/user-attachments/assets/0bfcd474-6213-4e94-bbdc-b5c98bab3c49)
 ![image](https://github.com/user-attachments/assets/95269ecd-6a1d-4caf-bf54-6b8857bdbe96)
