@@ -13,6 +13,7 @@ class Parser:
         self.escopo_atual = 'global'
         self.endereco = 0
         self.nos_com_erro = set()
+        self.profundidade_loop = 0
 
     def novo_no(self, label):
         self.node_id += 1
@@ -148,6 +149,16 @@ class Parser:
                 self.chamada_funcao()
             else:
                 self.erro("Esperado '=' ou '(' após identificador")
+        elif self.token.tipo == 'BREAK':
+            if self.profundidade_loop == 0:
+                self.erro("'break' fora de loop")
+            self.match('BREAK')
+            self.match('DELIM', ';')
+        elif self.token.tipo == 'CONTINUE':
+            if self.profundidade_loop == 0:
+                self.erro("'continue' fora de loop")
+            self.match('CONTINUE')
+            self.match('DELIM', ';')
         elif self.token.tipo == 'PRINT':
             self.match('PRINT')
             self.match('DELIM', '(')
@@ -227,7 +238,9 @@ class Parser:
         self.match('DELIM', '(')
         self.expressao()
         self.match('DELIM', ')')
+        self.profundidade_loop += 1
         self.comando()
+        self.profundidade_loop -= 1
 
     @rastrear("comando 'for'")
     def comando_for(self):
@@ -239,7 +252,9 @@ class Parser:
         self.match('DELIM', ';')
         self.for_incremento()
         self.match('DELIM', ')')
+        self.profundidade_loop += 1
         self.comando()
+        self.profundidade_loop -= 1
 
     @rastrear("inicialização de 'for'")
     def for_inicializacao(self):
