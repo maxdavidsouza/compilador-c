@@ -80,15 +80,19 @@ if st.button("Analisar"):
             st.write("Nenhum identificador encontrado.")
 
         parser = Parser(tokens)
-        parser.analisar()
+        try:
+            st.subheader("Análise Sintática")
+            parser.analisar()
+            st.write("Análise concluída com sucesso.")
+        except Exception as e:
+            st.error(str(e))
+        st.subheader("Árvore de Derivação Sintática")
+        st.graphviz_chart(parser.gerar_dot_string())
         st.subheader("Tabela de Símbolos (Pós Analisador Sintático)")
         if parser.tabela_simbolos:
             st.table(parser.tabela_simbolos)
         else:
             st.write("Nenhum símbolo registrado.")
-        st.subheader("Árvore de Derivação Sintática")
-        st.write("Análise sintática concluída com sucesso!")
-        st.graphviz_chart(parser.gerar_dot_string())
 
         # Caso utilizemos exportação de grafo (talvez seja necessário
         # fazer a instalação do app Graphviz no PATH do seu sistema operacional)

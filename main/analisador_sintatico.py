@@ -12,6 +12,7 @@ class Parser:
         self.tabela_simbolos = []
         self.escopo_atual = 'global'
         self.endereco = 0
+        self.nos_com_erro = set()
 
     def novo_no(self, label):
         self.node_id += 1
@@ -28,8 +29,13 @@ class Parser:
                 label = label_func(self) if callable(label_func) else label_func
                 no_atual = self.novo_no(label)
                 self.parent_stack.append(no_atual)
-                resultado = func(self, *args, **kwargs)
-                self.parent_stack.pop()
+                try:
+                    resultado = func(self, *args, **kwargs)
+                except Exception as e:
+                    self.nos_com_erro.add(no_atual)
+                    raise e
+                finally:
+                    self.parent_stack.pop()
                 return resultado
             return wrapper
         return decorator
@@ -363,7 +369,8 @@ class Parser:
         ]
         for node_id, label in self.nodes:
             label_esc = label.replace('"', '\\"')
-            linhas.append(f'  {node_id} [label="{label_esc}"];')
+            fill = "lightcoral" if node_id in self.nos_com_erro else "lightblue"
+            linhas.append(f'  {node_id} [label="{label_esc}", fillcolor={fill}];')
         for from_id, to_id in self.edges:
             linhas.append(f'  {from_id} -> {to_id};')
         linhas.append("}")
