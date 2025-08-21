@@ -46,6 +46,7 @@ int main() {
 '''
 
 import streamlit as st
+import pandas as pd
 from analisador_lexico import Lexer
 from analisador_sintatico import Parser
 
@@ -61,9 +62,31 @@ if st.button("Analisar"):
         for t in tokens:
             st.write(t)
 
-        st.subheader("Análisa sintática (Top-Down Preditiva)")
+        # 🔹 Mostrando a Tabela de Símbolos
+        st.subheader("Tabela de Símbolos (Pós Analisador Léxico)")
+        simbolos = [
+            {
+                "Nome": s.nome,
+                "Tipo": s.tipo,
+                "Escopo": s.escopo,
+                "Endereço": s.endereco
+            }
+                for s in lexer.tabela_simbolos.tabela.values()
+            ]
+        if simbolos:
+            df = pd.DataFrame(simbolos)
+            st.table(df)
+        else:
+            st.write("Nenhum identificador encontrado.")
+
         parser = Parser(tokens)
         parser.analisar()
+        st.subheader("Tabela de Símbolos (Pós Analisador Sintático)")
+        if parser.tabela_simbolos:
+            st.table(parser.tabela_simbolos)
+        else:
+            st.write("Nenhum símbolo registrado.")
+        st.subheader("Árvore de Derivação Sintática")
         st.write("Análise sintática concluída com sucesso!")
         st.graphviz_chart(parser.gerar_dot_string())
 

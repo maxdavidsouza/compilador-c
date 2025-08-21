@@ -5,12 +5,13 @@ class Parser:
         self.tokens = tokens
         self.pos = 0
         self.token = self.tokens[self.pos]
-
-        # Grafo de rastreabilidade
         self.node_id = 0
         self.nodes = []
         self.edges = []
         self.parent_stack = []
+        self.tabela_simbolos = []
+        self.escopo_atual = 'global'
+        self.endereco = 0
 
     def novo_no(self, label):
         self.node_id += 1
@@ -24,16 +25,13 @@ class Parser:
     def rastrear(label_func):
         def decorator(func):
             def wrapper(self, *args, **kwargs):
-                # Avalia o label no momento da chamada
                 label = label_func(self) if callable(label_func) else label_func
                 no_atual = self.novo_no(label)
                 self.parent_stack.append(no_atual)
                 resultado = func(self, *args, **kwargs)
                 self.parent_stack.pop()
                 return resultado
-
             return wrapper
-
         return decorator
 
     def avanca(self):
@@ -61,48 +59,49 @@ class Parser:
         if self.token.tipo != 'EOF':
             self.erro("Esperado EOF no final")
 
-    # <programa> ::= { <declaracao> }
     @rastrear("programa")
     def programa(self):
         while self.token.tipo in {'INT', 'FLOAT', 'CHAR', 'BOOL', 'VOID'}:
             self.declaracao()
 
-    # <declaracao> ::= <tipo> ID <decl_continua>
     @rastrear("declaracao")
     def declaracao(self):
+        tipo = self.token.tipo.lower()
         self.tipo()
+        id_token = self.token
         self.match('ID')
-        self.decl_continua()
+        self.inserir_tabela(id_token.valor, tipo, self.escopo_atual)
+        self.decl_continua(tipo, id_token)
 
-    # <decl_continua> ::= ;
-    #                  | , ID { , ID } ;
-    #                  | ( [ <parametros_formais> ] ) <bloco>
     @rastrear("decl_continua")
-    def decl_continua(self):
+    def decl_continua(self, tipo=None, id_token=None):
         if self.token.tipo == 'DELIM' and self.token.valor == ';':
             self.match('DELIM', ';')
         elif self.token.tipo == 'DELIM' and self.token.valor == ',':
             while self.token.tipo == 'DELIM' and self.token.valor == ',':
                 self.match('DELIM', ',')
+                id_token = self.token
                 self.match('ID')
+                self.inserir_tabela(id_token.valor, tipo, self.escopo_atual)
             self.match('DELIM', ';')
         elif self.token.tipo == 'DELIM' and self.token.valor == '(':
             self.match('DELIM', '(')
+            escopo_anterior = self.escopo_atual
+            self.escopo_atual = id_token.valor
             if not (self.token.tipo == 'DELIM' and self.token.valor == ')'):
                 self.parametros_formais()
             self.match('DELIM', ')')
             self.bloco()
+            self.escopo_atual = escopo_anterior
         else:
             self.erro(f"Esperado ';', ',' ou '(' após identificador")
 
-    # <tipo> ::= int | float | char | bool | void
     def tipo(self):
         if self.token.tipo in {'INT', 'FLOAT', 'CHAR', 'BOOL', 'VOID'}:
             self.match(self.token.tipo)
         else:
             self.erro("Esperado tipo")
 
-    # <parametros_formais> ::= <parametro> { , <parametro> }
     @rastrear("parametros_de_funcao")
     def parametros_formais(self):
         self.parametro()
@@ -110,13 +109,14 @@ class Parser:
             self.match('DELIM', ',')
             self.parametro()
 
-    # <parametro> ::= <tipo> ID
     @rastrear("parametro")
     def parametro(self):
+        tipo = self.token.tipo.lower()
         self.tipo()
+        id_token = self.token
         self.match('ID')
+        self.inserir_tabela(id_token.valor, tipo, self.escopo_atual)
 
-    # <bloco> ::= { { <comando> } }
     @rastrear("bloco de função")
     def bloco(self):
         self.match('DELIM', '{')
@@ -124,22 +124,11 @@ class Parser:
             self.comando()
         self.match('DELIM', '}')
 
-    # <comando> ::= <decl_var>
-    #             | <atribuicao>
-    #             | <chamada_funcao>
-    #             | <comando_if>
-    #             | <comando_while>
-    #             | <comando_for>
-    #             | <comando_return>
-    #             | break ;
-    #             | continue ;
-    #             | <bloco>
     @rastrear("comando")
     def comando(self):
         if self.token.tipo in {'INT', 'FLOAT', 'CHAR', 'BOOL'}:
             self.decl_var()
         elif self.token.tipo == 'ID':
-            # lookahead para decidir atribuição ou chamada de função
             prox = self.tokens[self.pos + 1] if self.pos + 1 < len(self.tokens) else None
             if prox and prox.tipo == 'ATRIB':
                 self.atribuicao()
@@ -147,6 +136,12 @@ class Parser:
                 self.chamada_funcao()
             else:
                 self.erro("Esperado '=' ou '(' após identificador")
+        elif self.token.tipo == 'PRINT':
+            self.match('PRINT')
+            self.match('DELIM', '(')
+            self.expressao()
+            self.match('DELIM', ')')
+            self.match('DELIM', ';')
         elif self.token.tipo == 'IF':
             self.comando_if()
         elif self.token.tipo == 'WHILE':
@@ -166,17 +161,20 @@ class Parser:
         else:
             self.erro("Comando inválido")
 
-    # <decl_var> ::= <tipo> ID { , ID } ;
     @rastrear("decl_var")
     def decl_var(self):
+        tipo = self.token.tipo.lower()
         self.tipo()
+        id_token = self.token
         self.match('ID')
+        self.inserir_tabela(id_token.valor, tipo, self.escopo_atual)
         while self.token.tipo == 'DELIM' and self.token.valor == ',':
             self.match('DELIM', ',')
+            id_token = self.token
             self.match('ID')
+            self.inserir_tabela(id_token.valor, tipo, self.escopo_atual)
         self.match('DELIM', ';')
 
-    # <atribuicao> ::= ID = <expressao> ;
     @rastrear("atribuição")
     def atribuicao(self):
         self.match('ID')
@@ -184,7 +182,6 @@ class Parser:
         self.expressao()
         self.match('DELIM', ';')
 
-    # <chamada_funcao> ::= ID ( [ <lista_argumentos> ] ) ;
     @rastrear("chamada de função")
     def chamada_funcao(self):
         self.match('ID')
@@ -194,7 +191,6 @@ class Parser:
         self.match('DELIM', ')')
         self.match('DELIM', ';')
 
-    # <lista_argumentos> ::= <expressao> { , <expressao> }
     @rastrear("lista de argumentos")
     def lista_argumentos(self):
         self.expressao()
@@ -202,7 +198,6 @@ class Parser:
             self.match('DELIM', ',')
             self.expressao()
 
-    # <comando_if> ::= if ( <expressao> ) <comando> [ else <comando> ]
     @rastrear("comando 'if'")
     def comando_if(self):
         self.match('IF')
@@ -214,7 +209,6 @@ class Parser:
             self.match('ELSE')
             self.comando()
 
-    # <comando_while> ::= while ( <expressao> ) <comando>
     @rastrear("comando 'while'")
     def comando_while(self):
         self.match('WHILE')
@@ -223,7 +217,6 @@ class Parser:
         self.match('DELIM', ')')
         self.comando()
 
-    # <comando_for> ::= for ( <for_inicializacao> ; <expressao> ; <for_incremento> ) <comando>
     @rastrear("comando 'for'")
     def comando_for(self):
         self.match('FOR')
@@ -236,7 +229,6 @@ class Parser:
         self.match('DELIM', ')')
         self.comando()
 
-    # <for_inicializacao> ::= <decl_var_for> | <atribuicao_for>
     @rastrear("inicialização de 'for'")
     def for_inicializacao(self):
         if self.token.tipo in {'INT', 'FLOAT', 'CHAR', 'BOOL'}:
@@ -246,36 +238,37 @@ class Parser:
         else:
             self.erro("Esperado declaração com inicialização ou atribuição na inicialização do for")
 
-    # <decl_var_for> ::= <tipo> ID [ = <expressao> ] { , ID [ = <expressao> ] }
     @rastrear("declaração de variáveis no 'for'")
     def decl_var_for(self):
+        tipo = self.token.tipo.lower()
         self.tipo()
+        id_token = self.token
         self.match('ID')
+        self.inserir_tabela(id_token.valor, tipo, self.escopo_atual)
         if self.token.tipo == 'ATRIB':
             self.match('ATRIB', '=')
             self.expressao()
         while self.token.tipo == 'DELIM' and self.token.valor == ',':
             self.match('DELIM', ',')
+            id_token = self.token
             self.match('ID')
+            self.inserir_tabela(id_token.valor, tipo, self.escopo_atual)
             if self.token.tipo == 'ATRIB':
                 self.match('ATRIB', '=')
                 self.expressao()
 
-    # <atribuicao_for> ::= ID = <expressao>
     @rastrear("atribuição de valores no 'for'")
     def atribuicao_for(self):
         self.match('ID')
         self.match('ATRIB', '=')
         self.expressao()
 
-    # <for_incremento> ::= ID = <expressao>
     @rastrear("incremento do 'for'")
     def for_incremento(self):
         self.match('ID')
         self.match('ATRIB', '=')
         self.expressao()
 
-    # <comando_return> ::= return [ <expressao> ] ;
     @rastrear("comando 'return'")
     def comando_return(self):
         self.match('RETURN')
@@ -283,26 +276,22 @@ class Parser:
             self.expressao()
         self.match('DELIM', ';')
 
-    # <expressao> ::= <expressao_logica>
     @rastrear("expressao")
     def expressao(self):
         self.expressao_logica()
 
-    # <expressao_logica> ::= <expressao_logica2> { || <expressao_logica2> }
     def expressao_logica(self):
         self.expressao_logica2()
         while self.token.tipo == 'OP_LOG' and self.token.valor == '||':
             self.match('OP_LOG', '||')
             self.expressao_logica2()
 
-    # <expressao_logica2> ::= <expressao_logica3> { && <expressao_logica3> }
     def expressao_logica2(self):
         self.expressao_logica3()
         while self.token.tipo == 'OP_LOG' and self.token.valor == '&&':
             self.match('OP_LOG', '&&')
             self.expressao_logica3()
 
-    # <expressao_logica3> ::= [ ! ] <expressao_relacional>
     def expressao_logica3(self):
         if self.token.tipo == 'OP_LOG' and self.token.valor == '!':
             self.match('OP_LOG', '!')
@@ -310,7 +299,6 @@ class Parser:
         else:
             self.expressao_relacional()
 
-    # <expressao_relacional> ::= <expressao_aritmetica> [ <op_relacional> <expressao_aritmetica> ]
     @rastrear("expressao_relacional")
     def expressao_relacional(self):
         self.expressao_aritmetica()
@@ -318,14 +306,12 @@ class Parser:
             self.op_relacional()
             self.expressao_aritmetica()
 
-    # <op_relacional> ::= == | != | <= | >= | < | >
     def op_relacional(self):
         if self.token.valor in {'==', '!=', '<=', '>=', '<', '>'}:
             self.match('OP_REL', self.token.valor)
         else:
             self.erro("Operador relacional inválido")
 
-    # <expressao_aritmetica> ::= <termo> { ( + | - ) <termo> }
     @rastrear("expressao_aritmetica")
     def expressao_aritmetica(self):
         self.termo()
@@ -333,7 +319,6 @@ class Parser:
             self.op_aritmetico()
             self.termo()
 
-    # <termo> ::= <fator> { ( * | / | % ) <fator> }
     @rastrear("termo")
     def termo(self):
         self.fator()
@@ -341,18 +326,12 @@ class Parser:
             self.op_aritmetico()
             self.fator()
 
-    # <op_aritmetico> ::= + | - | * | / | %
     def op_aritmetico(self):
         if self.token.valor in {'+', '-', '*', '/', '%'}:
             self.match('OP_ARIT', self.token.valor)
         else:
             self.erro("Operador aritmético inválido")
 
-    # <fator> ::= NUM_INT
-    #           | ID [ ( [ <lista_argumentos> ] ) ]
-    #           | true
-    #           | false
-    #           | ( <expressao> )
     def fator(self):
         if self.token.tipo == 'NUM_INT':
             self.match('NUM_INT')
@@ -389,3 +368,12 @@ class Parser:
             linhas.append(f'  {from_id} -> {to_id};')
         linhas.append("}")
         return "\n".join(linhas)
+
+    def inserir_tabela(self, nome, tipo, escopo):
+        self.endereco += 4
+        self.tabela_simbolos.append({
+            'identificador': nome,
+            'tipo': tipo,
+            'escopo': escopo,
+            'endereco': self.endereco
+        })

@@ -10,6 +10,34 @@ class Token:
     def __repr__(self):
         return f"Token({self.tipo}, '{self.valor}', linha={self.linha}, coluna={self.coluna})"
 
+
+class Simbolo:
+    def __init__(self, nome, tipo=None, escopo="global", endereco=None):
+        self.nome = nome
+        self.tipo = tipo
+        self.escopo = escopo
+        self.endereco = endereco
+
+    def __repr__(self):
+        return f"Simbolo(nome={self.nome}, tipo={self.tipo}, escopo={self.escopo}, endereco={self.endereco})"
+
+
+class TabelaSimbolos:
+    def __init__(self):
+        self.tabela = {}
+
+    def adicionar(self, nome, tipo=None, escopo="global"):
+        if nome not in self.tabela:
+            self.tabela[nome] = Simbolo(nome, tipo, escopo)
+        return self.tabela[nome]
+
+    def buscar(self, nome):
+        return self.tabela.get(nome)
+
+    def __repr__(self):
+        return str(self.tabela)
+
+
 class Lexer:
     def __init__(self, codigo):
         self.codigo = codigo
@@ -18,10 +46,11 @@ class Lexer:
         self.pos = 0
         self.tokens = []
         self.erros = []
+        self.tabela_simbolos = TabelaSimbolos()
 
         self.palavras_reservadas = {
             'int', 'float', 'if', 'else', 'while', 'for', 'break', 'continue', 'return', 'void',
-            'char', 'bool', 'true', 'false'
+            'char', 'bool', 'true', 'false', 'print'
         }
 
         self.regex_tokens = [
@@ -53,11 +82,16 @@ class Lexer:
                 elif tipo == 'ESPACO' or tipo == 'COMENT':
                     self.coluna += len(valor)
                 else:
-                    if tipo == 'ID' and valor in self.palavras_reservadas:
-                        tipo = valor.upper()  # palavra-chave vira tipo em maiúsculo
+                    if tipo == 'ID':
+                        if valor in self.palavras_reservadas:
+                            tipo = valor.upper()
+                        else:
+                            self.tabela_simbolos.adicionar(valor)
+
                     token = Token(tipo, valor, self.linha, self.coluna)
                     self.tokens.append(token)
                     self.coluna += len(valor)
+
                 self.pos += len(valor)
             else:
                 erro_char = self.codigo[self.pos]
