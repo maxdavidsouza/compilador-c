@@ -49,13 +49,24 @@ import streamlit as st
 import pandas as pd
 from analisador_lexico import Lexer
 from analisador_sintatico import Parser
+from analisador_semantico import AnalisadorSemantico
 
-st.title("Analisador Léxico e Sintático para linguagem C simplificada")
+st.title("Analisador Léxico, Semântico e Sintático para linguagem C simplificada")
 
-codigo = st.text_area("Digite o código-fonte aqui:", height=300, value=entrada)
+# Código de exemplo com um erro semântico (atribuição de bool para int)
+entrada_com_erro = '''
+int main() {
+    int a;
+    a = true; // Erro Semântico!
+    return 0;
+}
+'''
+
+codigo = st.text_area("Digite o código-fonte aqui:", height=300, value=entrada_com_erro)
 
 if st.button("Analisar"):
     try:
+        # Análise Léxica (sem mudanças)
         st.subheader("Tokens:")
         lexer = Lexer(codigo)
         tokens = lexer.analisar()
@@ -79,26 +90,22 @@ if st.button("Analisar"):
         else:
             st.write("Nenhum identificador encontrado.")
 
-        parser = Parser(tokens)
-        try:
-            st.subheader("Análise Sintática")
-            parser.analisar()
-            st.write("Análise concluída com sucesso.")
-        except Exception as e:
-            st.error(str(e))
+        # Análise Sintática e Semântica
+        parser = AnalisadorSemantico(tokens) # MUDANÇA AQUI
+        
+        st.subheader("Análise Sintática e Semântica")
+        parser.analisar()
+        st.success("Análise Sintática e Semântica concluída com sucesso!")
+        
         st.subheader("Árvore de Derivação Sintática")
         st.graphviz_chart(parser.gerar_dot_string())
-        st.subheader("Tabela de Símbolos (Pós Analisador Sintático)")
+        
+        st.subheader("Tabela de Símbolos (Pós Análise Semântica)")
         if parser.tabela_simbolos:
-            st.table(parser.tabela_simbolos)
+            df = pd.DataFrame(parser.tabela_simbolos)
+            st.table(df)
         else:
             st.write("Nenhum símbolo registrado.")
 
-        # Caso utilizemos exportação de grafo (talvez seja necessário
-        # fazer a instalação do app Graphviz no PATH do seu sistema operacional)
-        #dot_str = parser.gerar_dot_string()
-        #grafo = graphviz.Source(dot_str)
-        #grafo.render('grafo_gerado', format='png', cleanup=True)
-
     except Exception as e:
-        st.error(f"Erro: {e}")
+        st.error(str(e)) # Vai mostrar tanto erros sintáticos quanto semânticos
