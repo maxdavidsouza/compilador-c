@@ -55,7 +55,9 @@ class Lexer:
 
         self.regex_tokens = [
             ('COMENT', r'//.*'),
+            ('CHAR', r"'[^'\n]'"),
             ('STRING', r'"[^"\n]*"'),
+            ('NUM_FLOAT', r'\d+\.\d+'),
             ('NUM_INT', r'\d+'),
             ('ID', r'[a-zA-Z_][a-zA-Z0-9_]*'),
             ('OP_REL', r'==|!=|<=|>=|<|>'),
