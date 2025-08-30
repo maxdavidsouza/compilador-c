@@ -1,7 +1,5 @@
 from collections import defaultdict
-
 from analisador_lexico import Token
-
 
 class AnalisadorSemantico:
     def __init__(self, tokens):
@@ -63,10 +61,10 @@ class AnalisadorSemantico:
     # --- Funções de Erro (Sintático e Semântico) ---
     def erro_sintatico(self, msg):
         raise Exception(
-            f"Erro de Sintaxe na linha {self.token.linha}, coluna {self.token.coluna}: {msg} (token: {self.token})")
+            f"Erro de sintaxe na linha {self.token.linha}, coluna {self.token.coluna}: {msg} (token: {self.token})")
 
     def erro_semantico(self, msg):
-        raise Exception(f"Erro Semântico na linha {self.token.linha}, coluna {self.token.coluna}: {msg}")
+        raise Exception(f"Erro semântico na linha {self.token.linha}, coluna {self.token.coluna}: {msg}")
 
     def match(self, tipo_esperado, valor_esperado=None):
         if self.token.tipo == tipo_esperado:
@@ -78,9 +76,8 @@ class AnalisadorSemantico:
         else:
             self.erro_sintatico(f"Esperado token do tipo {tipo_esperado}, encontrado {self.token.tipo}")
 
-    # --- Funções da Tabela de Símbolos (Aprimoradas) ---
+    # --- Alteração na inserção na tabela ---
     def inserir_tabela(self, nome, tipo, escopo, params=None):
-        # Verifica se o símbolo já foi declarado no escopo local
         if self.buscar_simbolo(nome, escopo_local=True):
             self.erro_semantico(f"Identificador '{nome}' já declarado no escopo '{escopo}'.")
 
@@ -90,7 +87,8 @@ class AnalisadorSemantico:
             'tipo': tipo,
             'escopo': escopo,
             'endereco': self.endereco,
-            'params': params if params is not None else []
+            'params': params if params is not None else [],
+            'inicializada': False  # novo campo
         }
         self.tabela_simbolos.append(simbolo)
 
@@ -197,7 +195,16 @@ class AnalisadorSemantico:
         self.tipo()
         id_token = self.token
         self.match('ID')
-        self.inserir_tabela(id_token.valor, tipo, self.escopo_atual)
+        simbolo = {
+            'identificador': id_token.valor,
+            'tipo': tipo,
+            'escopo': self.escopo_atual,
+            'endereco': self.endereco + 4,
+            'params': [],
+            'inicializada': True
+        }
+        self.endereco += 4
+        self.tabela_simbolos.append(simbolo)
         return {'tipo': tipo, 'nome': id_token.valor}
 
     @rastrear("bloco de função")
@@ -267,10 +274,12 @@ class AnalisadorSemantico:
         self.match('ATRIB', '=')
         tipo_expressao = self.expressao()
 
-        # REQUISITO: Não permitir atribuição de valores a tipos diferentes
         if tipo_variavel != tipo_expressao:
-            self.erro_semantico(
-                f"Não é possível atribuir um valor do tipo '{tipo_expressao}' a uma variável do tipo '{tipo_variavel}'.")
+            if not (tipo_variavel == 'float' and tipo_expressao == 'int'):
+                self.erro_semantico(
+                    f"Não é possível atribuir um valor do tipo '{tipo_expressao}' a uma variável do tipo '{tipo_variavel}'.")
+
+        simbolo['inicializada'] = True
 
         self.match('DELIM', ';')
         if self.escopo_atual != 'global':
@@ -378,9 +387,13 @@ class AnalisadorSemantico:
             op = self.token.valor
             self.match('OP_ARIT', op)
             tipo_dir = self.termo()
-            if tipo_esq != tipo_dir or tipo_esq not in ('int', 'float'):
+            # permite int + float ou float + int
+            if tipo_esq not in ('int', 'float') or tipo_dir not in ('int', 'float'):
                 self.erro_semantico(
                     f"Operação aritmética '{op}' entre tipos incompatíveis: '{tipo_esq}' e '{tipo_dir}'.")
+            # tipo resultante: se algum for float, resultado é float
+            if tipo_esq == 'float' or tipo_dir == 'float':
+                tipo_esq = 'float'
         return tipo_esq
 
     @rastrear("termo")
@@ -390,9 +403,11 @@ class AnalisadorSemantico:
             op = self.token.valor
             self.match('OP_ARIT', op)
             tipo_dir = self.fator()
-            if tipo_esq != tipo_dir or tipo_esq not in ('int', 'float'):
+            if tipo_esq not in ('int', 'float') or tipo_dir not in ('int', 'float'):
                 self.erro_semantico(
                     f"Operação aritmética '{op}' entre tipos incompatíveis: '{tipo_esq}' e '{tipo_dir}'.")
+            if tipo_esq == 'float' or tipo_dir == 'float':
+                tipo_esq = 'float'
         return tipo_esq
 
     @rastrear("fator")
@@ -400,6 +415,9 @@ class AnalisadorSemantico:
         if self.token.tipo == 'NUM_INT':
             self.match('NUM_INT')
             return 'int'
+        elif self.token.tipo == 'NUM_FLOAT':
+            self.match('NUM_FLOAT')
+            return 'float'
         elif self.token.tipo == 'STRING':
             self.match('STRING')
             return 'char'
@@ -416,6 +434,8 @@ class AnalisadorSemantico:
                 simbolo = self.buscar_simbolo(id_token.valor)
                 if not simbolo:
                     self.erro_semantico(f"Variável '{id_token.valor}' não declarada.")
+                if not simbolo.get('inicializada', False):
+                    self.erro_semantico(f"Variável '{id_token.valor}' usada antes de ser inicializada.")
                 if self.escopo_atual != 'global':
                     self.leitura_variaveis[id_token.valor].add(self.escopo_atual)
                 return simbolo['tipo']
@@ -431,7 +451,7 @@ class AnalisadorSemantico:
                 self.erro_semantico(f"Operador '!' exige operando booleano, encontrou '{tipo_fat}'.")
             return 'bool'
         else:
-            self.erro_sintatico("Fator inválido na expressão: esperado número, ID, bool, ou '('")
+            self.erro_sintatico(f"Fator inválido na expressão: esperado número, ID, bool, ou '('. Encontrado ")
 
     def gerar_dot_string(self):
         # (código idêntico ao que você já tem)
