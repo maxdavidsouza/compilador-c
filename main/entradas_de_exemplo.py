@@ -1,5 +1,62 @@
 entradas_de_exemplo = {
-    "Entrada Complexa sem Erro": '''int a;
+    "Teste 1: Variáveis Locais e Globais, Laço e Condicional Simples": '''int g;
+int loopTest(int x) {
+    int sum;
+    sum = 0;
+    while (x > 0) {
+        sum = sum + x;
+        x = x - 1;
+    }
+    return sum;
+}
+
+int main() {
+    int y;
+    y = loopTest(5);
+    print(y); // Deve imprimir 15
+    if (y > 10) {
+        g = 2;
+    } else {
+        g = 3;
+    }
+    print(g); // Deve imprimir 2
+    return 0;
+}       
+''',
+    "Teste 2: Atribuições Múltiplas e Expressões Complexas": '''int int_var;
+float float_var;
+bool bool_var;
+
+void complexCalc() {
+    int_var = 10 + 2 * 5 - 3;
+    float_var = 5.5 / 2.0;
+    bool_var = int_var > 15 && float_var < 3.0;
+    print(int_var); // Deve imprimir 17
+    print(float_var); // Deve imprimir 2.75
+    printBool(bool_var); // Deve imprimir 1 (true)
+}
+
+int main() {
+    complexCalc();
+    return 0;
+}
+''',
+    "Teste 3: Recursão e return Múltiplos": '''int fibonacci(int n) {
+    if (n <= 1) {
+        return n;
+    } else {
+        return fibonacci(n-1) + fibonacci(n-2);
+    }
+}
+
+int main() {
+    int result;
+    result = fibonacci(8);
+    print(result); // Deve imprimir 21
+    return 0;
+}
+''',
+    "Teste 4: Entrada Complexa com Múltiplas Funções": '''int a;
 int soma(int a, int b) {
     a = 4;
     return a + b;
@@ -50,15 +107,7 @@ int main() {
     return 0;
 }
 ''',
-    "Teste de Otimizador de Código 3AC": '''int main() {
-    int x, y;
-    x = 10;
-    y = 5;
-    print(x+y);
-    return 0;
-}       
-''',
-    "Teste de Gerador de Código 3AC": '''int soma(int x, int y){
+    "Teste 5: Gerador de Código 3AC": '''int soma(int x, int y){
     return x + y;
 }
     
@@ -75,7 +124,14 @@ int main() {
     return 0;
 }       
 ''',
-
+    "Teste 6: Otimizador de Código 3AC": '''int main() {
+        int x, y;
+        x = 10;
+        y = 5;
+        print(x+y);
+        return 0;
+    }       
+''',
     "Erro 1: tipo incompatível": '''int main() {
     int a;
     a = true; // Erro Semântico!
