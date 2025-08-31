@@ -56,5 +56,9 @@ if st.button("Analisar"):
         st.subheader("Grafo de Dependências")
         st.graphviz_chart(parser.gerar_grafo_dependencias())
 
+        # Código Intermediário (3AC)
+        st.subheader("Código Intermediário (3AC):")
+        st.code("\n".join(parser.codigo_3ac), language='text')
+
     except Exception as e:
         st.error(str(e))
