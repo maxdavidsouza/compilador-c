@@ -13,13 +13,10 @@ class Otimizador:
             try:
                 return float(operando)
             except ValueError:
-                return tabela_simbolos.get(operando)
+                return tabela_simbolos.get(operando, operando)
 
-    def _avaliar_expressao(self, op1, op, op2, tabela_simbolos):
-        v1 = self._obter_valor(op1, tabela_simbolos)
-        v2 = self._obter_valor(op2, tabela_simbolos)
-
-        if v1 is not None and v2 is not None:
+    def _avaliar_expressao(self, v1, op, v2):
+        if isinstance(v1, (int, float)) and isinstance(v2, (int, float)):
             if op == '+': return v1 + v2
             if op == '-': return v1 - v2
             if op == '*': return v1 * v2
@@ -29,8 +26,8 @@ class Otimizador:
                 else:
                     return None
             if op == '==': return int(v1 == v2)
-            if op == '>':  return int(v1 > v2)
-            if op == '<':  return int(v1 < v2)
+            if op == '>': return int(v1 > v2)
+            if op == '<': return int(v1 < v2)
         return None
 
     def _analisar_funcoes(self):
@@ -52,63 +49,76 @@ class Otimizador:
 
     def _passagem_inlining_e_dobramento(self, codigo):
         codigo_novo = []
-        tabela_simbolos = {}
+        tabela_constantes = {}
+        tabela_copias = {}
 
         for linha in codigo:
             linha_limpa = linha.strip()
             partes = re.split(r'[\s,]+', linha_limpa)
-            if not partes or linha_limpa.endswith(':'):
+            if not partes or not partes[0] or linha_limpa.endswith(':'):
                 codigo_novo.append(linha)
                 continue
 
             instrucao = partes[0]
 
-            # --- Inlining de Funções ---
-            if instrucao == 'call':
-                if len(partes) >= 3:
-                    nome_funcao = partes[1]
-                    dest = partes[2]
+            # 1. Propagação de cópias: substitui a cópia pelo nome original
+            novas_partes = []
+            for parte in partes:
+                if parte in tabela_copias:
+                    novas_partes.append(tabela_copias[parte])
+                else:
+                    novas_partes.append(parte)
+            partes = novas_partes
 
-                    if nome_funcao in self.funcoes:
-                        func_code = self.funcoes[nome_funcao]
-                        # Tenta encontrar o valor de retorno
-                        for func_line in func_code:
-                            func_parts = func_line.strip().split()
-                            if func_parts and func_parts[0] == 'return':
-                                valor_retorno = self._obter_valor(func_parts[1], {})
-                                if valor_retorno is not None:
-                                    codigo_novo.append(f"{dest} = {valor_retorno}")
-                                    break
-                        else:  # Se o loop terminar sem break, a função não retornou uma constante
-                            codigo_novo.append(linha)
+            # 2. Inlining de Funções Simples
+            if instrucao == 'call' and len(partes) >= 3:
+                nome_funcao = partes[1]
+                dest = partes[2]
+                if nome_funcao in self.funcoes:
+                    func_code = self.funcoes[nome_funcao]
+                    for func_line in func_code:
+                        func_parts = func_line.strip().split()
+                        if func_parts and func_parts[0] == 'return':
+                            valor_retorno = self._obter_valor(func_parts[1], {})
+                            if isinstance(valor_retorno, (int, float)):
+                                tabela_constantes[dest] = valor_retorno
+                                codigo_novo.append(f"{dest} = {valor_retorno}")
+                                break
                     else:
-                        codigo_novo.append(linha)
+                        codigo_novo.append(" ".join(partes))
+                else:
+                    codigo_novo.append(" ".join(partes))
 
-            # --- Dobramento e Propagação ---
+            # 3. Dobramento de Constantes e Propagação
             elif len(partes) >= 3 and partes[1] == '=':
                 dest = partes[0]
-                if len(partes) == 3:  # Atribuição simples: a = t1
-                    valor = self._obter_valor(partes[2], tabela_simbolos)
-                    if valor is not None:
-                        tabela_simbolos[dest] = valor
-                        codigo_novo.append(f"{dest} = {valor}")
+                if len(partes) == 3:  # Atribuição simples: a = 5 ou a = b
+                    fonte = partes[2]
+                    valor_fonte = self._obter_valor(fonte, tabela_constantes)
+                    if isinstance(valor_fonte, (int, float)):
+                        tabela_constantes[dest] = valor_fonte
+                        codigo_novo.append(f"{dest} = {valor_fonte}")
                     else:
-                        tabela_simbolos[dest] = partes[2]
-                        codigo_novo.append(linha)
+                        tabela_copias[dest] = fonte
+                        codigo_novo.append(" ".join(partes))
                 elif len(partes) == 5:  # Expressão: t3 = a < 5
-                    op1, op, op2 = partes[2], partes[3], partes[4]
-                    resultado = self._avaliar_expressao(op1, op, op2, tabela_simbolos)
-                    if resultado is not None:
-                        tabela_simbolos[dest] = resultado
+                    op1_str, op, op2_str = partes[2], partes[3], partes[4]
+                    v1 = tabela_constantes.get(op1_str, op1_str)
+                    v2 = tabela_constantes.get(op2_str, op2_str)
+
+                    resultado = self._avaliar_expressao(v1, op, v2)
+
+                    if isinstance(resultado, (int, float)):
+                        tabela_constantes[dest] = resultado
                         codigo_novo.append(f"{dest} = {resultado}")
                     else:
-                        codigo_novo.append(linha)
+                        codigo_novo.append(" ".join(partes))
 
-            # --- Propagação para outros comandos ---
+            # 4. Propagação para outros comandos
             else:
                 for i, parte in enumerate(partes):
-                    valor = self._obter_valor(parte, tabela_simbolos)
-                    if valor is not None:
+                    valor = tabela_constantes.get(parte, parte)
+                    if isinstance(valor, (int, float)):
                         partes[i] = str(valor)
                 codigo_novo.append(" ".join(partes))
 
@@ -133,18 +143,20 @@ class Otimizador:
                 if len(partes) > 1:
                     dest = partes[1]
                 if dest not in variaveis_vivas:
-                    continue  # Pula a declaração morta
+                    continue
 
             elif len(partes) >= 3 and partes[1] == '=':
                 dest = partes[0]
                 usadas_nesta_linha.update(
-                    p for p in partes[2:] if p and not p.isdigit() and not (p.startswith('L') and p[1:].isdigit()))
+                    p for p in partes[2:] if p and not p.isdigit() and not (p.startswith('L') and p[1:].isdigit())
+                )
                 if dest not in variaveis_vivas:
-                    continue  # Pula a atribuição morta
+                    continue
 
             elif instrucao in ['print', 'param', 'return', 'if_false', 'goto', 'call']:
                 usadas_nesta_linha.update(
-                    p for p in partes[1:] if p and not p.isdigit() and not (p.startswith('L') and p[1:].isdigit()))
+                    p for p in partes[1:] if p and not p.isdigit() and not (p.startswith('L') and p[1:].isdigit())
+                )
 
             if dest is not None:
                 variaveis_vivas.discard(dest)
@@ -152,7 +164,6 @@ class Otimizador:
             codigo_final.insert(0, linha_limpa)
             variaveis_vivas.update(usadas_nesta_linha)
 
-        # Limpeza final de linhas vazias e goto redundante
         codigo_final = [linha for linha in codigo_final if linha.strip()]
         if codigo_final and codigo_final[0].strip() == 'goto main' and codigo_final[1].strip() == 'main:':
             codigo_final.pop(0)
