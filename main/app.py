@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 from analisador_lexico import Lexer
 from analisador_semantico import AnalisadorSemantico
+from otimizador_de_codigo import Otimizador
 from entradas_de_exemplo import entradas_de_exemplo
 
 st.title("Analisador Léxico, Sintático e Semântico para linguagem C simplificada")
@@ -59,6 +60,12 @@ if st.button("Analisar"):
         # Código Intermediário (3AC)
         st.subheader("Código Intermediário (3AC):")
         st.code("\n".join(parser.codigo_3ac), language='text')
+
+        # Código Intermediário Otimizado
+        st.subheader("Código Intermediário Otimizado:")
+        otimizador = Otimizador(parser.codigo_3ac)
+        codigo_otimizado = otimizador.otimizar()
+        st.code("\n".join(codigo_otimizado), language='text')
 
     except Exception as e:
         st.error(str(e))

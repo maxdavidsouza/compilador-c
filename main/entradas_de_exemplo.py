@@ -50,6 +50,31 @@ int main() {
     return 0;
 }
 ''',
+    "Teste de Otimizador de Código 3AC": '''int main() {
+    int x, y;
+    x = 10;
+    y = 5;
+    print(x+y);
+    return 0;
+}       
+''',
+    "Teste de Gerador de Código 3AC": '''int soma(int x, int y){
+    return x + y;
+}
+    
+int soma2(int x, int y){
+    return soma(x,y) + soma(x,y);
+}
+    
+int main() {
+    int x, y, z;
+    x = 10;
+    y = 5;
+    z = soma2(x,y);
+    print(z);
+    return 0;
+}       
+''',
 
     "Erro 1: tipo incompatível": '''int main() {
     int a;
