@@ -162,6 +162,12 @@ class AnalisadorSemantico:
         elif self.token.tipo == 'DELIM' and self.token.valor == '(':
             self.match('DELIM', '(')
             escopo_anterior = self.escopo_atual
+            # Checa se já existe um identificador com esse nome no escopo atual
+            if self.buscar_simbolo(id_token.valor, escopo_local=True):
+                self.erro_semantico(f"Função '{id_token.valor}' já declarada no escopo '{escopo_anterior}'.")
+            # Reforça com o set de funções já vistas
+            if id_token.valor in self.funcoes_declaradas:
+                self.erro_semantico(f"Função '{id_token.valor}' já declarada.")
             self.escopo_atual = id_token.valor
             self.tipo_funcao_atual = tipo
             self.return_encontrado = False
