@@ -5,7 +5,7 @@ from analisador_semantico import AnalisadorSemantico
 from otimizador_de_codigo import Otimizador
 from entradas_de_exemplo import entradas_de_exemplo
 
-st.title("Analisador Léxico, Sintático e Semântico para linguagem C simplificada")
+st.title("Compilador para linguagem C simplificada")
 
 codigo_selecionado = st.selectbox("Escolha um exemplo de código", list(entradas_de_exemplo.keys()))
 codigo = st.text_area(
