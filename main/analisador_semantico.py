@@ -219,7 +219,18 @@ class AnalisadorSemantico:
         self.tipo()
         id_token = self.token
         self.match('ID')
-        self.inserir_tabela(id_token.valor, tipo, self.escopo_atual) # corrije o incremento `self.endereco += 4`.
+        self.endereco += 4  # Incrementa o endereço para o parâmetro
+        simbolo = {
+            'identificador': id_token.valor,
+            'tipo': tipo,
+            'escopo': self.escopo_atual,
+            'endereco': self.endereco,
+            'params': [],
+            'inicializada': True  # Parâmetros são sempre inicializados
+        }
+        # E o adiciona diretamente na tabela
+        self.tabela_simbolos.append(simbolo)
+
         self.codigo_3ac.append(f'param {id_token.valor}')
         return {'tipo': tipo, 'nome': id_token.valor}
 
