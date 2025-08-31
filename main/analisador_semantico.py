@@ -591,35 +591,48 @@ class AnalisadorSemantico:
         self.codigo_3ac.append(f'goto FIM_LOOP_{self.profundidade_loop}')
 
     def gerar_grafo_dependencias(self):
-        linhas = ["digraph Dependencias {"]
-        linhas.append("  node [shape=box, style=filled, fillcolor=lightblue];")
-
-        funcoes = [s['identificador'] for s in self.tabela_simbolos if s.get('params') is not None]
-        for f in funcoes:
-            linhas.append(f'  "{f}" [shape=ellipse, style=filled, fillcolor=lightgray, color=black];')
-
-        variaveis_por_escopo = {}
-        for s in self.tabela_simbolos:
-            if s.get('params') is None:
-                nome_completo = f"{s['escopo']}_{s['identificador']}" if s['escopo'] != 'global' else s['identificador']
-                variaveis_por_escopo[s['identificador']] = nome_completo
-                linhas.append(f'  "{nome_completo}" [shape=box, style=filled, fillcolor=white, color=black];')
+        nodes_com_aresta = set()
+        todas_as_arestas = []
 
         for f, chamadas in self.dependencias_funcao.items():
             for c in chamadas:
-                linhas.append(f'  "{f}" -> "{c}" [label="chama", color=black, style=solid];')
+                todas_as_arestas.append(f'  "{f}" -> "{c}" [label="chama", color=black, style=solid];')
+                nodes_com_aresta.add(f)
+                nodes_com_aresta.add(c)
 
         for f, vars_escritas in self.escrita_variaveis.items():
             for v in vars_escritas:
                 nome_completo = f"{f}_{v}"
-                linhas.append(
+                todas_as_arestas.append(
                     f'  "{f}" -> "{nome_completo}" [label="escreve", fontcolor=blue, color=blue, style=solid, arrowhead=vee];')
+                nodes_com_aresta.add(f)
+                nodes_com_aresta.add(nome_completo)
 
         for v, funcoes_que_leem in self.leitura_variaveis.items():
             for f in funcoes_que_leem:
                 nome_completo = f"{f}_{v}"
-                linhas.append(
+                todas_as_arestas.append(
                     f'  "{nome_completo}" -> "{f}" [label="lê", fontcolor=red, color=red, style=dashed, arrowhead=vee];')
+                nodes_com_aresta.add(f)
+                nodes_com_aresta.add(nome_completo)
 
+        linhas = ["digraph Dependencias {"]
+        linhas.append("  node [shape=box, style=filled, fillcolor=lightblue];")
+
+        for s in self.tabela_simbolos:
+            nome_identificador = s['identificador']
+            if s.get('params') is not None:  # É uma função
+                if nome_identificador in nodes_com_aresta:
+                    linhas.append(
+                        f'  "{nome_identificador}" [shape=ellipse, style=filled, fillcolor=lightgray, color=black];')
+            else:  # É uma variável
+                nome_completo = f"{s['escopo']}_{s['identificador']}" if s['escopo'] != 'global' else s['identificador']
+                if nome_completo in nodes_com_aresta:
+                    linhas.append(f'  "{nome_completo}" [shape=box, style=filled, fillcolor=white, color=black];')
+                elif nome_identificador in nodes_com_aresta:
+                    # Caso para variáveis globais sem prefixo de escopo
+                    linhas.append(f'  "{nome_identificador}" [shape=box, style=filled, fillcolor=white, color=black];')
+
+        linhas.extend(todas_as_arestas)
         linhas.append("}")
         return "\n".join(linhas)
