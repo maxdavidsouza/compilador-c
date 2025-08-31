@@ -95,13 +95,14 @@ class AnalisadorSemantico:
             self.erro_semantico(f"Identificador '{nome}' já declarado no escopo '{escopo}'.")
 
         self.endereco += 4
+        inicializada = True if params is not None else False
         simbolo = {
             'identificador': nome,
             'tipo': tipo,
             'escopo': escopo,
             'endereco': self.endereco,
             'params': params if params is not None else [],
-            'inicializada': False
+            'inicializada': inicializada
         }
         self.tabela_simbolos.append(simbolo)
         if params is None:
@@ -179,15 +180,7 @@ class AnalisadorSemantico:
             if not (self.token.tipo == 'DELIM' and self.token.valor == ')'):
                 params = self.parametros_formais()
 
-            simbolo = {
-                'identificador': id_token.valor,
-                'tipo': tipo,
-                'escopo': escopo_anterior,
-                'endereco': self.endereco,
-                'params': params,
-                'inicializada': True
-            }
-            self.tabela_simbolos.append(simbolo)
+            self.inserir_tabela(id_token.valor, tipo, escopo_anterior, params=params) # insere a função na tabela de símbolos usando a função unificada
             self.funcoes_declaradas.add(id_token.valor)
 
             self.match('DELIM', ')')
@@ -226,16 +219,7 @@ class AnalisadorSemantico:
         self.tipo()
         id_token = self.token
         self.match('ID')
-        simbolo = {
-            'identificador': id_token.valor,
-            'tipo': tipo,
-            'escopo': self.escopo_atual,
-            'endereco': self.endereco + 4,
-            'params': [],
-            'inicializada': True
-        }
-        self.endereco += 4
-        self.tabela_simbolos.append(simbolo)
+        self.inserir_tabela(id_token.valor, tipo, self.escopo_atual) # corrije o incremento `self.endereco += 4`.
         self.codigo_3ac.append(f'param {id_token.valor}')
         return {'tipo': tipo, 'nome': id_token.valor}
 
