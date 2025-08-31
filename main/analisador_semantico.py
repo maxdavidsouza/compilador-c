@@ -1,5 +1,6 @@
 from collections import defaultdict
 from analisador_lexico import Token
+import operator
 
 
 class AnalisadorSemantico:
@@ -103,42 +104,35 @@ class AnalisadorSemantico:
             'inicializada': False
         }
         self.tabela_simbolos.append(simbolo)
-        # Geração de código para alocação de variável
-        if params is None:  # Só adiciona a instrução 'declare' para variáveis
+        if params is None:
             self.codigo_3ac.append(f'declare {nome}, {tipo}')
 
     def buscar_simbolo(self, nome, escopo_local=False):
-        # Busca no escopo atual
         for simbolo in reversed(self.tabela_simbolos):
             if simbolo['identificador'] == nome and simbolo['escopo'] == self.escopo_atual:
                 return simbolo
 
-        # Se não for busca local, busca também no escopo global
         if not escopo_local:
             for simbolo in reversed(self.tabela_simbolos):
                 if simbolo['identificador'] == nome and simbolo['escopo'] == 'global':
                     return simbolo
         return None
 
-    # --- Início da Análise Gramatical com Ações Semânticas ---
     def analisar(self):
         self.programa()
         if self.token.tipo != 'EOF':
             self.erro_sintatico("Esperado EOF no final")
         print("Análise semântica concluída com sucesso.")
 
-        # Verificação obrigatória do main
         main_simbolo = self.buscar_simbolo('main')
         if not main_simbolo:
             self.erro_semantico("Função 'main' não declarada.")
         else:
-            # Main deve ser int e sem parâmetros
             if main_simbolo['tipo'] != 'int':
                 self.erro_semantico("Função 'main' deve ter tipo 'int'.")
             if main_simbolo.get('params'):
                 self.erro_semantico("Função 'main' não deve ter parâmetros.")
 
-        # Inserindo o 'main' na 3AC
         self.codigo_3ac.insert(0, 'goto main')
         self.codigo_3ac.append('halt')
 
@@ -172,7 +166,6 @@ class AnalisadorSemantico:
             self.tipo_funcao_atual = tipo
             self.return_encontrado = False
 
-            # Geração de código para rótulo de função
             self.codigo_3ac.append(f'\n{self.escopo_atual}:')
             self.codigo_3ac.append('push_stack')
 
@@ -180,7 +173,6 @@ class AnalisadorSemantico:
             if not (self.token.tipo == 'DELIM' and self.token.valor == ')'):
                 params = self.parametros_formais()
 
-            # Apenas cria o símbolo, sem a instrução 'declare' para a função
             simbolo = {
                 'identificador': id_token.valor,
                 'tipo': tipo,
@@ -199,7 +191,6 @@ class AnalisadorSemantico:
                 self.erro_semantico(
                     f"Função '{self.escopo_atual}' do tipo {self.tipo_funcao_atual} deve ter um comando 'return'.")
 
-            # Geração de código para retorno
             self.codigo_3ac.append('pop_stack')
             self.codigo_3ac.append('ret')
 
@@ -239,7 +230,6 @@ class AnalisadorSemantico:
         }
         self.endereco += 4
         self.tabela_simbolos.append(simbolo)
-        # Geração de código para o parâmetro
         self.codigo_3ac.append(f'param {id_token.valor}')
         return {'tipo': tipo, 'nome': id_token.valor}
 
@@ -316,9 +306,7 @@ class AnalisadorSemantico:
                 self.erro_semantico(
                     f"Não é possível atribuir um valor do tipo '{tipo_expressao}' a uma variável do tipo '{tipo_variavel}'.")
 
-        # Geração de código de atribuição
         self.codigo_3ac.append(f'{id_token.valor} = {end_expr}')
-
         simbolo['inicializada'] = True
 
         self.match('DELIM', ';')
@@ -340,7 +328,6 @@ class AnalisadorSemantico:
         if not (self.token.tipo == 'DELIM' and self.token.valor == ')'):
             tipos_argumentos = self.lista_argumentos()
 
-        # Adicionando instruções 'param' para a 3AC
         for end_arg in tipos_argumentos:
             self.codigo_3ac.append(f'param {end_arg}')
 
@@ -357,7 +344,6 @@ class AnalisadorSemantico:
 
         self.match('DELIM', ')')
 
-        # Geração de código de chamada
         end_retorno = None
         if funcao_simbolo['tipo'] != 'void':
             end_retorno = self.novo_temp()
@@ -404,7 +390,6 @@ class AnalisadorSemantico:
         self.match('DELIM', ';')
         self.return_encontrado = True
 
-    # ---- EXPRESSÕES LÓGICAS, RELACIONAIS E ARITMÉTICAS COMPLETAS ----
     @rastrear("expressao")
     def expressao(self):
         return self.expressao_logica()
@@ -607,21 +592,34 @@ class AnalisadorSemantico:
 
     def gerar_grafo_dependencias(self):
         linhas = ["digraph Dependencias {"]
+        linhas.append("  node [shape=box, style=filled, fillcolor=lightblue];")
+
         funcoes = [s['identificador'] for s in self.tabela_simbolos if s.get('params') is not None]
         for f in funcoes:
             linhas.append(f'  "{f}" [shape=ellipse, style=filled, fillcolor=lightgray, color=black];')
-        variaveis = [s['identificador'] for s in self.tabela_simbolos if s.get('params') is None]
-        for v in variaveis:
-            linhas.append(f'  "{v}" [shape=box, style=filled, fillcolor=white, color=black];')
+
+        variaveis_por_escopo = {}
+        for s in self.tabela_simbolos:
+            if s.get('params') is None:
+                nome_completo = f"{s['escopo']}_{s['identificador']}" if s['escopo'] != 'global' else s['identificador']
+                variaveis_por_escopo[s['identificador']] = nome_completo
+                linhas.append(f'  "{nome_completo}" [shape=box, style=filled, fillcolor=white, color=black];')
+
         for f, chamadas in self.dependencias_funcao.items():
             for c in chamadas:
                 linhas.append(f'  "{f}" -> "{c}" [label="chama", color=black, style=solid];')
+
         for f, vars_escritas in self.escrita_variaveis.items():
             for v in vars_escritas:
+                nome_completo = f"{f}_{v}"
                 linhas.append(
-                    f'  "{f}" -> "{v}" [label="escreve", fontcolor=blue, color=blue, style=solid, arrowhead=vee];')
+                    f'  "{f}" -> "{nome_completo}" [label="escreve", fontcolor=blue, color=blue, style=solid, arrowhead=vee];')
+
         for v, funcoes_que_leem in self.leitura_variaveis.items():
             for f in funcoes_que_leem:
-                linhas.append(f'  "{v}" -> "{f}" [label="lê", fontcolor=red, color=red, style=dashed, arrowhead=vee];')
+                nome_completo = f"{f}_{v}"
+                linhas.append(
+                    f'  "{nome_completo}" -> "{f}" [label="lê", fontcolor=red, color=red, style=dashed, arrowhead=vee];')
+
         linhas.append("}")
         return "\n".join(linhas)
