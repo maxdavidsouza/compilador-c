@@ -187,9 +187,13 @@ streamlit run app.py
 
 ---
 
-## Imagens de execução do Projeto
+## Imagens de execução do Projeto usando um Código Simples
 
-![image](https://github.com/user-attachments/assets/2c4747b3-77f9-4f66-845b-25fb63a4df19)
-![image](https://github.com/user-attachments/assets/9166ec76-03f4-4252-9f4e-f1e4d71a5068)
-<img width="543" height="662" alt="image" src="https://github.com/user-attachments/assets/c1c2d07c-261f-4038-9617-0f605e9597d7" />
-<img width="538" height="210" alt="image" src="https://github.com/user-attachments/assets/4d282cd9-bd89-4bb8-bdb8-52dd4103464c" />
+<img width="717" height="407" alt="e-1" src="https://github.com/user-attachments/assets/dfab8752-c307-4e73-af07-c50ea54d3423" />
+<img width="482" height="600" alt="e-2" src="https://github.com/user-attachments/assets/feb1771d-3417-4888-ad1a-5dfc5482bac1" />
+<img width="722" height="174" alt="e-3" src="https://github.com/user-attachments/assets/ac0790f1-6bc5-4129-927e-45357cfdf26e" />
+<img width="721" height="134" alt="e-4" src="https://github.com/user-attachments/assets/b4431c78-1e42-48bb-9151-0be6b291af4a" />
+<img width="719" height="659" alt="e-5" src="https://github.com/user-attachments/assets/51d7a92b-556a-49e8-ada4-98f3f4455c1d" />
+<img width="712" height="364" alt="e-6" src="https://github.com/user-attachments/assets/9553fdc7-3f00-423f-9f54-86d9e14fe215" />
+<img width="719" height="166" alt="e-7" src="https://github.com/user-attachments/assets/12970e6d-f3cb-4533-96df-e84f368e60ec" />
+<img width="723" height="454" alt="e-8" src="https://github.com/user-attachments/assets/e440d4cf-8ce9-4be4-87b9-b94729c9b5ed" />
