@@ -121,7 +121,6 @@ class AnalisadorSemantico:
         self.programa()
         if self.token.tipo != 'EOF':
             self.erro_sintatico("Esperado EOF no final")
-        print("Análise semântica concluída com sucesso.")
 
         main_simbolo = self.buscar_simbolo('main')
         if not main_simbolo:
