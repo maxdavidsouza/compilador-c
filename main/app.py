@@ -5,6 +5,7 @@ from analisador_semantico import AnalisadorSemantico
 from otimizador_de_codigo import Otimizador
 from entradas_de_exemplo import entradas_de_exemplo
 
+st.set_page_config(page_title="Compilador C (Simplificado)")
 st.title("Compilador para linguagem C simplificada")
 
 codigo_selecionado = st.selectbox("Escolha um exemplo de código", list(entradas_de_exemplo.keys()))
