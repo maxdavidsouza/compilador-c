@@ -43,7 +43,7 @@ if st.button("Analisar"):
 
         # Árvore de Derivação Sintática
         st.subheader("Árvore de Derivação Sintática")
-        st.graphviz_chart(parser.gerar_dot_string())
+        st.graphviz_chart(parser.gerar_arvore_sintatica())
 
         # Tabela de Símbolos (pós semântico)
         st.subheader("Tabela de Símbolos (Pós Análise Semântica)")

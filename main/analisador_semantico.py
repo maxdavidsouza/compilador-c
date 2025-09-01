@@ -1,6 +1,7 @@
 from collections import defaultdict
 from analisador_lexico import Token
 
+
 class AnalisadorSemantico:
     def __init__(self, tokens):
         self.tokens = tokens
@@ -14,7 +15,9 @@ class AnalisadorSemantico:
         self.escopo_atual = 'global'
         self.endereco = 0
         self.nos_com_erro = set()
-        self.profundidade_loop = 0
+
+        self.loop_labels_stack = []
+
         self.tipo_funcao_atual = None
         self.return_encontrado = False
         self.funcoes_declaradas = set()
@@ -33,7 +36,6 @@ class AnalisadorSemantico:
         self.label_count += 1
         return f"L{self.label_count}"
 
-    # --- Funções de controle da árvore ---
     def novo_no(self, label):
         self.node_id += 1
         no_atual = self.node_id
@@ -69,7 +71,6 @@ class AnalisadorSemantico:
         else:
             self.token = Token('EOF', '', -1, -1)
 
-    # --- Funções de Erro ---
     def erro_sintatico(self, msg):
         raise Exception(
             f"Erro de sintaxe na linha {self.token.linha}, coluna {self.token.coluna}: {msg} (token: {self.token})")
@@ -87,7 +88,6 @@ class AnalisadorSemantico:
         else:
             self.erro_sintatico(f"Esperado token do tipo {tipo_esperado}, encontrado {self.token.tipo}")
 
-    # --- Alteração na inserção na tabela ---
     def inserir_tabela(self, nome, tipo, escopo, params=None):
         if self.buscar_simbolo(nome, escopo_local=True):
             self.erro_semantico(f"Identificador '{nome}' já declarado no escopo '{escopo}'.")
@@ -161,10 +161,8 @@ class AnalisadorSemantico:
         elif self.token.tipo == 'DELIM' and self.token.valor == '(':
             self.match('DELIM', '(')
             escopo_anterior = self.escopo_atual
-            # Checa se já existe um identificador com esse nome no escopo atual
             if self.buscar_simbolo(id_token.valor, escopo_local=True):
                 self.erro_semantico(f"Função '{id_token.valor}' já declarada no escopo '{escopo_anterior}'.")
-            # Reforça com o set de funções já vistas
             if id_token.valor in self.funcoes_declaradas:
                 self.erro_semantico(f"Função '{id_token.valor}' já declarada.")
             self.escopo_atual = id_token.valor
@@ -178,7 +176,7 @@ class AnalisadorSemantico:
             if not (self.token.tipo == 'DELIM' and self.token.valor == ')'):
                 params = self.parametros_formais()
 
-            self.inserir_tabela(id_token.valor, tipo, escopo_anterior, params=params) # insere a função na tabela de símbolos usando a função unificada
+            self.inserir_tabela(id_token.valor, tipo, escopo_anterior, params=params)
             self.funcoes_declaradas.add(id_token.valor)
 
             self.match('DELIM', ')')
@@ -217,18 +215,16 @@ class AnalisadorSemantico:
         self.tipo()
         id_token = self.token
         self.match('ID')
-        self.endereco += 4  # Incrementa o endereço para o parâmetro
+        self.endereco += 4
         simbolo = {
             'identificador': id_token.valor,
             'tipo': tipo,
             'escopo': self.escopo_atual,
             'endereco': self.endereco,
             'params': [],
-            'inicializada': True  # Parâmetros são sempre inicializados
+            'inicializada': True
         }
-        # E o adiciona diretamente na tabela
         self.tabela_simbolos.append(simbolo)
-
         self.codigo_3ac.append(f'param {id_token.valor}')
         return {'tipo': tipo, 'nome': id_token.valor}
 
@@ -258,6 +254,8 @@ class AnalisadorSemantico:
             self.comando_while()
         elif self.token.tipo == 'BREAK':
             self.comando_break()
+        elif self.token.tipo == 'CONTINUE':
+            self.comando_continue()
         elif self.token.tipo == 'RETURN':
             self.comando_return()
         elif self.token.tipo == 'DELIM' and self.token.valor == '{':
@@ -521,20 +519,6 @@ class AnalisadorSemantico:
             self.erro_sintatico(
                 f"Fator inválido na expressão: esperado número, ID, bool, ou '('. Encontrado {self.token.valor}")
 
-    def gerar_dot_string(self):
-        linhas = [
-            "digraph ParserTrace {",
-            "  node [shape=box, style=filled, fillcolor=lightblue];"
-        ]
-        for node_id, label in self.nodes:
-            label_esc = label.replace('"', '\\"')
-            fill = "lightcoral" if node_id in self.nos_com_erro else "lightblue"
-            linhas.append(f'  {node_id} [label="{label_esc}", fillcolor={fill}];')
-        for from_id, to_id in self.edges:
-            linhas.append(f'  {from_id} -> {to_id};')
-        linhas.append("}")
-        return "\n".join(linhas)
-
     @rastrear("comando 'if'")
     def comando_if(self):
         self.match('IF')
@@ -543,28 +527,27 @@ class AnalisadorSemantico:
         self.match('DELIM', ')')
 
         label_else = self.novo_label()
-        label_fim = self.novo_label()
 
         self.codigo_3ac.append(f'if_false {end_cond} goto {label_else}')
 
         self.comando()
 
-        self.codigo_3ac.append(f'goto {label_fim}')
-
         if self.token.tipo == 'ELSE':
-            self.match('ELSE')
+            label_fim = self.novo_label()
+            self.codigo_3ac.append(f'goto {label_fim}')
             self.codigo_3ac.append(f'{label_else}:')
+            self.match('ELSE')
             self.comando()
+            self.codigo_3ac.append(f'{label_fim}:')
         else:
             self.codigo_3ac.append(f'{label_else}:')
 
-        self.codigo_3ac.append(f'{label_fim}:')
-
     @rastrear("comando 'while'")
     def comando_while(self):
-        self.profundidade_loop += 1
         label_inicio = self.novo_label()
         label_fim = self.novo_label()
+
+        self.loop_labels_stack.append({'inicio': label_inicio, 'fim': label_fim})
 
         self.codigo_3ac.append(f'{label_inicio}:')
 
@@ -579,15 +562,39 @@ class AnalisadorSemantico:
         self.codigo_3ac.append(f'goto {label_inicio}')
         self.codigo_3ac.append(f'{label_fim}:')
 
-        self.profundidade_loop -= 1
+        self.loop_labels_stack.pop()
 
     @rastrear("break")
     def comando_break(self):
-        if self.profundidade_loop == 0:
+        if not self.loop_labels_stack:
             self.erro_semantico("'break' só pode ser usado dentro de laços")
         self.match('BREAK')
         self.match('DELIM', ';')
-        self.codigo_3ac.append(f'goto FIM_LOOP_{self.profundidade_loop}')
+        fim_label = self.loop_labels_stack[-1]['fim']
+        self.codigo_3ac.append(f'goto {fim_label}')
+
+    @rastrear("continue")
+    def comando_continue(self):
+        if not self.loop_labels_stack:
+            self.erro_semantico("'continue' só pode ser usado dentro de laços")
+        self.match('CONTINUE')
+        self.match('DELIM', ';')
+        inicio_label = self.loop_labels_stack[-1]['inicio']
+        self.codigo_3ac.append(f'goto {inicio_label}')
+
+    def gerar_arvore_sintatica(self):
+        linhas = [
+            "digraph ParserTrace {",
+            "  node [shape=box, style=filled, fillcolor=lightblue];"
+        ]
+        for node_id, label in self.nodes:
+            label_esc = label.replace('"', '\\"')
+            fill = "lightcoral" if node_id in self.nos_com_erro else "lightblue"
+            linhas.append(f'  {node_id} [label="{label_esc}", fillcolor={fill}];')
+        for from_id, to_id in self.edges:
+            linhas.append(f'  {from_id} -> {to_id};')
+        linhas.append("}")
+        return "\n".join(linhas)
 
     def gerar_grafo_dependencias(self):
         nodes_com_aresta = set()
@@ -620,16 +627,15 @@ class AnalisadorSemantico:
 
         for s in self.tabela_simbolos:
             nome_identificador = s['identificador']
-            if s.get('params') is not None:  # É uma função
+            if s.get('params') is not None:
                 if nome_identificador in nodes_com_aresta:
                     linhas.append(
                         f'  "{nome_identificador}" [shape=ellipse, style=filled, fillcolor=lightgray, color=black];')
-            else:  # É uma variável
+            else:
                 nome_completo = f"{s['escopo']}_{s['identificador']}" if s['escopo'] != 'global' else s['identificador']
                 if nome_completo in nodes_com_aresta:
                     linhas.append(f'  "{nome_completo}" [shape=box, style=filled, fillcolor=white, color=black];')
                 elif nome_identificador in nodes_com_aresta:
-                    # Caso para variáveis globais sem prefixo de escopo
                     linhas.append(f'  "{nome_identificador}" [shape=box, style=filled, fillcolor=white, color=black];')
 
         linhas.extend(todas_as_arestas)
