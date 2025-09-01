@@ -27,6 +27,10 @@ int main() {
 float float_var;
 bool bool_var;
 
+void printBool(bool a){
+print(a);
+}
+
 void complexCalc() {
     int_var = 10 + 2 * 5 - 3;
     float_var = 5.5 / 2.0;
@@ -112,7 +116,7 @@ int main() {
 }
     
 int soma2(int x, int y){
-    return soma(x,y) + soma(x,y);
+    return soma(x,y) + x + y;
 }
     
 int main() {
