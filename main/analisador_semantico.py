@@ -166,7 +166,6 @@ class AnalisadorSemantico:
                 self.erro_semantico(f"Função '{id_token.valor}' já declarada.")
             self.escopo_atual = id_token.valor
             self.tipo_funcao_atual = tipo
-            self.return_encontrado = False
 
             self.codigo_3ac.append(f'\n{self.escopo_atual}:')
             self.codigo_3ac.append('push_stack')
@@ -179,11 +178,12 @@ class AnalisadorSemantico:
             self.funcoes_declaradas.add(id_token.valor)
 
             self.match('DELIM', ')')
-            self.bloco()
 
-            if self.tipo_funcao_atual != 'void' and not self.return_encontrado:
+            garante_retorno = self.bloco()
+
+            if self.tipo_funcao_atual != 'void' and not garante_retorno:
                 self.erro_semantico(
-                    f"Função '{self.escopo_atual}' do tipo {self.tipo_funcao_atual} deve ter um comando 'return'.")
+                    f"Erro de fluxo de controle. A função '{self.escopo_atual}' do tipo {self.tipo_funcao_atual} pode não retornar um valor em todos os caminhos de execução.")
 
             self.codigo_3ac.append('pop_stack')
             self.codigo_3ac.append('ret')
@@ -230,35 +230,45 @@ class AnalisadorSemantico:
     @rastrear("bloco de função")
     def bloco(self):
         self.match('DELIM', '{')
+        encontrou_return = False
         while not (self.token.tipo == 'DELIM' and self.token.valor == '}'):
-            self.comando()
+            if self.comando():
+                encontrou_return = True
         self.match('DELIM', '}')
+        return encontrou_return
 
     @rastrear("comando")
     def comando(self):
         if self.token.tipo in {'INT', 'FLOAT', 'CHAR', 'BOOL'}:
             self.decl_var()
+            return False
         elif self.token.tipo == 'ID':
             prox = self.tokens[self.pos + 1] if self.pos + 1 < len(self.tokens) else None
             if prox and prox.tipo == 'ATRIB':
                 self.atribuicao()
+                return False
             elif prox and prox.tipo == 'DELIM' and prox.valor == '(':
                 self.chamada_funcao()
                 self.match('DELIM', ';')
+                return False
             else:
                 self.erro_sintatico("Esperado '=' ou '(' após identificador")
         elif self.token.tipo == 'IF':
-            self.comando_if()
+            return self.comando_if()
         elif self.token.tipo == 'WHILE':
             self.comando_while()
+            return False
         elif self.token.tipo == 'BREAK':
             self.comando_break()
+            return False
         elif self.token.tipo == 'CONTINUE':
             self.comando_continue()
+            return False
         elif self.token.tipo == 'RETURN':
             self.comando_return()
+            return True
         elif self.token.tipo == 'DELIM' and self.token.valor == '{':
-            self.bloco()
+            return self.bloco()
         elif self.token.tipo == 'PRINT':
             self.match('PRINT')
             self.match('DELIM', '(')
@@ -266,6 +276,7 @@ class AnalisadorSemantico:
             self.codigo_3ac.append(f'print {end_expr}')
             self.match('DELIM', ')')
             self.match('DELIM', ';')
+            return False
         else:
             self.erro_sintatico("Comando inválido")
 
@@ -384,7 +395,6 @@ class AnalisadorSemantico:
             self.codigo_3ac.append(f'return {end_retorno}')
 
         self.match('DELIM', ';')
-        self.return_encontrado = True
 
     @rastrear("expressao")
     def expressao(self):
@@ -522,24 +532,31 @@ class AnalisadorSemantico:
     def comando_if(self):
         self.match('IF')
         self.match('DELIM', '(')
-        end_cond, _ = self.expressao()
+        end_cond, tipo_cond = self.expressao()
         self.match('DELIM', ')')
+
+        if tipo_cond != 'bool':
+            self.erro_semantico(f"A condição da instrução 'if' deve ser do tipo booleano, encontrado '{tipo_cond}'.")
 
         label_else = self.novo_label()
 
         self.codigo_3ac.append(f'if_false {end_cond} goto {label_else}')
 
-        self.comando()
+        return_if = self.comando()
 
         if self.token.tipo == 'ELSE':
             label_fim = self.novo_label()
             self.codigo_3ac.append(f'goto {label_fim}')
             self.codigo_3ac.append(f'{label_else}:')
             self.match('ELSE')
-            self.comando()
+
+            return_else = self.comando()
             self.codigo_3ac.append(f'{label_fim}:')
+
+            return return_if and return_else
         else:
             self.codigo_3ac.append(f'{label_else}:')
+            return False
 
     @rastrear("comando 'while'")
     def comando_while(self):
@@ -552,8 +569,12 @@ class AnalisadorSemantico:
 
         self.match('WHILE')
         self.match('DELIM', '(')
-        end_cond, _ = self.expressao()
+        end_cond, tipo_cond = self.expressao()
         self.match('DELIM', ')')
+
+        if tipo_cond != 'bool':
+            self.erro_semantico(f"A condição da instrução 'while' deve ser do tipo booleano, encontrado '{tipo_cond}'.")
+
         self.codigo_3ac.append(f'if_false {end_cond} goto {label_fim}')
 
         self.comando()
