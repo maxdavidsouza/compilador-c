@@ -1,7 +1,5 @@
 from collections import defaultdict
 from analisador_lexico import Token
-import operator
-
 
 class AnalisadorSemantico:
     def __init__(self, tokens):
@@ -35,7 +33,7 @@ class AnalisadorSemantico:
         self.label_count += 1
         return f"L{self.label_count}"
 
-    # --- Funções de controle da árvore e da análise (iguais ao seu Parser) ---
+    # --- Funções de controle da árvore ---
     def novo_no(self, label):
         self.node_id += 1
         no_atual = self.node_id
@@ -71,7 +69,7 @@ class AnalisadorSemantico:
         else:
             self.token = Token('EOF', '', -1, -1)
 
-    # --- Funções de Erro (Sintático e Semântico) ---
+    # --- Funções de Erro ---
     def erro_sintatico(self, msg):
         raise Exception(
             f"Erro de sintaxe na linha {self.token.linha}, coluna {self.token.coluna}: {msg} (token: {self.token})")
