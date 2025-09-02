@@ -15,17 +15,21 @@ Este projeto tem como objetivo a implementação de um compilador para um subcon
 ## Tecnologias Utilizadas
 
 - **Python** – Linguagem de implementação
-- **re (Regex)** – Implementação de expressões regulares para o analisador léxico
+- **re (Regex)** – Implementação de expressões regulares para o analisador léxico e otimizador de código intermediário
 - **Graphviz** – Geração da árvore de derivação para o analisador sintático
+- **Pandas** - Geração da tabela de símbolos para o analisador semântico
 - **Streamlit** – Interface gráfica web para testes em tempo real
 
 ---
 
 ## Estrutura do Projeto
 
-- `analisador_lexico.py` – Responsável pela geração da tabela de tokens alinhada à entrada.
-- `analisador_sintatico.py` – Utilizando a estratégia parser top-down preditivo para análise sintática.
-- `app.py` – Interface interativa via Streamlit.
+- `analisador_lexico.py` – Responsável pela geração da tabela de tokens e tabela de símbolos inicial alinhada à entrada.
+- `analisador_sintatico.py` – Responsável pela análise sintática top-down preditiva.
+- `analisador_semantico.py` – Responsável pela análise semântica, atualização da tabela de símbolos e geração de código intermediário.
+- `otimizador_de_codigo.py` – Responsável pela redução de termos necessários para se alcançar o resultado do programa obtido no código intermediário.
+- `entradas_de_exemplo.py` – Conjunto de entradas de código para corretude e desenvolvimento de testes do compilador.
+- `app.py` – Interface interativa via Streamlit para entrada de códigos de testes.
 
 ---
 
@@ -179,7 +183,7 @@ Durante a implementação, a gramática original foi adaptada para uma versão L
 
 Para executar o projeto:
 
-- OBS: tenha o Python instalado
+- OBS: tenha o Python instalado e esteja com o cmd aberto dentro da pasta /main/ do projeto
 ```bash
 pip install streamlit graphviz
 streamlit run app.py
@@ -189,11 +193,10 @@ streamlit run app.py
 
 ## Imagens de execução do Projeto usando um Código Simples
 
-<img width="717" height="407" alt="e-1" src="https://github.com/user-attachments/assets/dfab8752-c307-4e73-af07-c50ea54d3423" />
-<img width="482" height="600" alt="e-2" src="https://github.com/user-attachments/assets/feb1771d-3417-4888-ad1a-5dfc5482bac1" />
-<img width="722" height="174" alt="e-3" src="https://github.com/user-attachments/assets/ac0790f1-6bc5-4129-927e-45357cfdf26e" />
-<img width="721" height="134" alt="e-4" src="https://github.com/user-attachments/assets/b4431c78-1e42-48bb-9151-0be6b291af4a" />
-<img width="719" height="659" alt="e-5" src="https://github.com/user-attachments/assets/51d7a92b-556a-49e8-ada4-98f3f4455c1d" />
-<img width="712" height="364" alt="e-6" src="https://github.com/user-attachments/assets/9553fdc7-3f00-423f-9f54-86d9e14fe215" />
-<img width="719" height="166" alt="e-7" src="https://github.com/user-attachments/assets/12970e6d-f3cb-4533-96df-e84f368e60ec" />
-<img width="723" height="454" alt="e-8" src="https://github.com/user-attachments/assets/e440d4cf-8ce9-4be4-87b9-b94729c9b5ed" />
+<img width="746" height="638" alt="g1" src="https://github.com/user-attachments/assets/30279400-b1d4-4f6a-8d2c-d38ed68da45d" />
+<img width="494" height="1049" alt="g2" src="https://github.com/user-attachments/assets/f0cac90c-585c-4f10-9146-0bbebd4322fe" />
+<img width="353" height="1047" alt="g3" src="https://github.com/user-attachments/assets/9873d0e3-263e-425f-af64-c37307d4d53a" />
+<img width="739" height="965" alt="g4" src="https://github.com/user-attachments/assets/86f9e0bd-788c-4f55-862b-0bf0e01d7393" />
+<img width="732" height="657" alt="g5" src="https://github.com/user-attachments/assets/f0711dd2-9ccd-47fc-a781-de4b3d5b93b9" />
+<img width="728" height="812" alt="g6" src="https://github.com/user-attachments/assets/ddd7a132-558e-412e-831e-bc168195086f" />
+<img width="730" height="620" alt="g7" src="https://github.com/user-attachments/assets/3e637721-8b87-487b-98a2-4f8b32672154" />
