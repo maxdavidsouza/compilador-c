@@ -59,9 +59,7 @@ class AnalisadorSemantico:
                 finally:
                     self.parent_stack.pop()
                 return resultado
-
             return wrapper
-
         return decorator
 
     def avanca(self):
@@ -72,8 +70,7 @@ class AnalisadorSemantico:
             self.token = Token('EOF', '', -1, -1)
 
     def erro_sintatico(self, msg):
-        raise Exception(
-            f"Erro de sintaxe na linha {self.token.linha}, coluna {self.token.coluna}: {msg} (token: {self.token})")
+        raise Exception(f"Erro de sintaxe na linha {self.token.linha}, coluna {self.token.coluna}: {msg} (token: {self.token})")
 
     def erro_semantico(self, msg):
         raise Exception(f"Erro semântico na linha {self.token.linha}, coluna {self.token.coluna}: {msg}")
@@ -91,7 +88,6 @@ class AnalisadorSemantico:
     def inserir_tabela(self, nome, tipo, escopo, params=None):
         if self.buscar_simbolo(nome, escopo_local=True):
             self.erro_semantico(f"Identificador '{nome}' já declarado no escopo '{escopo}'.")
-
         self.endereco += 4
         inicializada = True if params is not None else False
         simbolo = {
@@ -110,7 +106,6 @@ class AnalisadorSemantico:
         for simbolo in reversed(self.tabela_simbolos):
             if simbolo['identificador'] == nome and simbolo['escopo'] == self.escopo_atual:
                 return simbolo
-
         if not escopo_local:
             for simbolo in reversed(self.tabela_simbolos):
                 if simbolo['identificador'] == nome and simbolo['escopo'] == 'global':
@@ -121,7 +116,6 @@ class AnalisadorSemantico:
         self.programa()
         if self.token.tipo != 'EOF':
             self.erro_sintatico("Esperado EOF no final")
-
         main_simbolo = self.buscar_simbolo('main')
         if not main_simbolo:
             self.erro_semantico("Função 'main' não declarada.")
@@ -130,7 +124,6 @@ class AnalisadorSemantico:
                 self.erro_semantico("Função 'main' deve ter tipo 'int'.")
             if main_simbolo.get('params'):
                 self.erro_semantico("Função 'main' não deve ter parâmetros.")
-
         self.codigo_3ac.insert(0, 'goto main')
         self.codigo_3ac.append('halt')
 
@@ -166,28 +159,19 @@ class AnalisadorSemantico:
                 self.erro_semantico(f"Função '{id_token.valor}' já declarada.")
             self.escopo_atual = id_token.valor
             self.tipo_funcao_atual = tipo
-
             self.codigo_3ac.append(f'\n{self.escopo_atual}:')
             self.codigo_3ac.append('push_stack')
-
             params = []
             if not (self.token.tipo == 'DELIM' and self.token.valor == ')'):
                 params = self.parametros_formais()
-
             self.inserir_tabela(id_token.valor, tipo, escopo_anterior, params=params)
             self.funcoes_declaradas.add(id_token.valor)
-
             self.match('DELIM', ')')
-
             garante_retorno = self.bloco()
-
             if self.tipo_funcao_atual != 'void' and not garante_retorno:
-                self.erro_semantico(
-                    f"Erro de fluxo de controle. A função '{self.escopo_atual}' do tipo {self.tipo_funcao_atual} pode não retornar um valor em todos os caminhos de execução.")
-
+                self.erro_semantico(f"Erro de fluxo de controle. A função '{self.escopo_atual}' do tipo {self.tipo_funcao_atual} pode não retornar um valor em todos os caminhos de execução.")
             self.codigo_3ac.append('pop_stack')
             self.codigo_3ac.append('ret')
-
             self.escopo_atual = escopo_anterior
             self.tipo_funcao_atual = None
         else:
@@ -298,24 +282,17 @@ class AnalisadorSemantico:
     def atribuicao(self):
         id_token = self.token
         self.match('ID')
-
         simbolo = self.buscar_simbolo(id_token.valor)
         if not simbolo:
             self.erro_semantico(f"Variável '{id_token.valor}' não declarada.")
-
         tipo_variavel = simbolo['tipo']
-
         self.match('ATRIB', '=')
         end_expr, tipo_expressao = self.expressao()
-
         if tipo_variavel != tipo_expressao:
             if not (tipo_variavel == 'float' and tipo_expressao == 'int'):
-                self.erro_semantico(
-                    f"Não é possível atribuir um valor do tipo '{tipo_expressao}' a uma variável do tipo '{tipo_variavel}'.")
-
+                self.erro_semantico(f"Não é possível atribuir um valor do tipo '{tipo_expressao}' a uma variável do tipo '{tipo_variavel}'.")
         self.codigo_3ac.append(f'{id_token.valor} = {end_expr}')
         simbolo['inicializada'] = True
-
         self.match('DELIM', ';')
         if self.escopo_atual != 'global':
             self.escrita_variaveis[self.escopo_atual].add(id_token.valor)
@@ -324,37 +301,32 @@ class AnalisadorSemantico:
     def chamada_funcao(self):
         id_token = self.token
         self.match('ID')
-
         funcao_simbolo = self.buscar_simbolo(id_token.valor)
         if not funcao_simbolo:
             self.erro_semantico(f"Função '{id_token.valor}' não declarada.")
-
         self.match('DELIM', '(')
-
-        enderecos_argumentos = []
+        enderecos_tipos = []
         if not (self.token.tipo == 'DELIM' and self.token.valor == ')'):
-            enderecos_argumentos = self.lista_argumentos()
-
-        for end_arg in enderecos_argumentos:
+            enderecos_tipos = self.lista_argumentos()
+        for end_arg, tipo_arg in enderecos_tipos:
             self.codigo_3ac.append(f'param {end_arg}')
-
         params_esperados = funcao_simbolo.get('params', [])
-        if len(enderecos_argumentos) != len(params_esperados):
-            self.erro_semantico(
-                f"Função '{id_token.valor}' espera {len(params_esperados)} argumentos, mas recebeu {len(enderecos_argumentos)}.")
-
+        if len(enderecos_tipos) != len(params_esperados):
+            self.erro_semantico(f"Função '{id_token.valor}' espera {len(params_esperados)} argumentos, mas recebeu {len(enderecos_tipos)}.")
+        for i, (end_arg, tipo_arg) in enumerate(enderecos_tipos):
+            param_tipo = params_esperados[i]['tipo']
+            if tipo_arg != param_tipo:
+                if not (param_tipo == 'float' and tipo_arg == 'int'):
+                    self.erro_semantico(f"Argumento {i + 1} da chamada da função '{id_token.valor}': tipo incompatível. Esperado '{param_tipo}', mas recebeu '{tipo_arg}'.")
         self.match('DELIM', ')')
-
         end_retorno = None
         if funcao_simbolo['tipo'] != 'void':
             end_retorno = self.novo_temp()
-            self.codigo_3ac.append(f'{end_retorno} = call {id_token.valor}, {len(enderecos_argumentos)}')
+            self.codigo_3ac.append(f'{end_retorno} = call {id_token.valor}, {len(enderecos_tipos)}')
         else:
-            self.codigo_3ac.append(f'call {id_token.valor}, {len(enderecos_argumentos)}')
-
+            self.codigo_3ac.append(f'call {id_token.valor}, {len(enderecos_tipos)}')
         if self.escopo_atual != 'global':
             self.dependencias_funcao[self.escopo_atual].add(id_token.valor)
-
         return end_retorno, funcao_simbolo['tipo']
 
     @rastrear("lista de argumentos")
@@ -366,28 +338,22 @@ class AnalisadorSemantico:
             self.match('DELIM', ',')
             end, tipo = self.expressao()
             enderecos_tipos.append((end, tipo))
-
-        return [end for end, tipo in enderecos_tipos]
+        return enderecos_tipos
 
     @rastrear("comando 'return'")
     def comando_return(self):
         self.match('RETURN')
-
         if self.tipo_funcao_atual == 'void':
             if not (self.token.tipo == 'DELIM' and self.token.valor == ';'):
                 self.erro_semantico(f"Função 'void' '{self.escopo_atual}' não pode retornar um valor.")
             self.codigo_3ac.append('ret')
         else:
             if self.token.tipo == 'DELIM' and self.token.valor == ';':
-                self.erro_semantico(
-                    f"Função '{self.escopo_atual}' deve retornar um valor do tipo '{self.tipo_funcao_atual}'.")
-
+                self.erro_semantico(f"Função '{self.escopo_atual}' deve retornar um valor do tipo '{self.tipo_funcao_atual}'.")
             end_retorno, tipo_retorno = self.expressao()
             if tipo_retorno != self.tipo_funcao_atual:
-                self.erro_semantico(
-                    f"Tipo de retorno incompatível. A função '{self.escopo_atual}' espera '{self.tipo_funcao_atual}' mas recebeu '{tipo_retorno}'.")
+                self.erro_semantico(f"Tipo de retorno incompatível. A função '{self.escopo_atual}' espera '{self.tipo_funcao_atual}' mas recebeu '{tipo_retorno}'.")
             self.codigo_3ac.append(f'return {end_retorno}')
-
         self.match('DELIM', ';')
 
     @rastrear("expressao")
@@ -403,7 +369,6 @@ class AnalisadorSemantico:
             end_dir, tipo_dir = self.expressao_relacional()
             if tipo_esq != 'bool' or tipo_dir != 'bool':
                 self.erro_semantico(f"Operação lógica '{op}' exige operandos booleanos.")
-
             end_temp = self.novo_temp()
             self.codigo_3ac.append(f'{end_temp} = {end_esq} {op} {end_dir}')
             end_esq = end_temp
@@ -418,9 +383,7 @@ class AnalisadorSemantico:
             self.match('OP_REL')
             end_dir, tipo_dir = self.expressao_aritmetica()
             if tipo_esq != tipo_dir:
-                self.erro_semantico(
-                    f"Operação relacional '{op}' entre tipos incompatíveis: '{tipo_esq}' e '{tipo_dir}'.")
-
+                self.erro_semantico(f"Operação relacional '{op}' entre tipos incompatíveis: '{tipo_esq}' e '{tipo_dir}'.")
             end_temp = self.novo_temp()
             self.codigo_3ac.append(f'{end_temp} = {end_esq} {op} {end_dir}')
             end_esq = end_temp
@@ -435,9 +398,7 @@ class AnalisadorSemantico:
             self.match('OP_ARIT', op)
             end_dir, tipo_dir = self.termo()
             if tipo_esq not in ('int', 'float') or tipo_dir not in ('int', 'float'):
-                self.erro_semantico(
-                    f"Operação aritmética '{op}' entre tipos incompatíveis: '{tipo_esq}' e '{tipo_dir}'.")
-
+                self.erro_semantico(f"Operação aritmética '{op}' entre tipos incompatíveis: '{tipo_esq}' e '{tipo_dir}'.")
             end_temp = self.novo_temp()
             self.codigo_3ac.append(f'{end_temp} = {end_esq} {op} {end_dir}')
             end_esq = end_temp
@@ -453,9 +414,7 @@ class AnalisadorSemantico:
             self.match('OP_ARIT', op)
             end_dir, tipo_dir = self.fator()
             if tipo_esq not in ('int', 'float') or tipo_dir not in ('int', 'float'):
-                self.erro_semantico(
-                    f"Operação aritmética '{op}' entre tipos incompatíveis: '{tipo_esq}' e '{tipo_dir}'.")
-
+                self.erro_semantico(f"Operação aritmética '{op}' entre tipos incompatíveis: '{tipo_esq}' e '{tipo_dir}'.")
             end_temp = self.novo_temp()
             self.codigo_3ac.append(f'{end_temp} = {end_esq} {op} {end_dir}')
             end_esq = end_temp
@@ -514,13 +473,11 @@ class AnalisadorSemantico:
             end_fat, tipo_fat = self.fator()
             if tipo_fat != 'bool':
                 self.erro_semantico(f"Operador '!' exige operando booleano, encontrou '{tipo_fat}'.")
-
             end_temp = self.novo_temp()
             self.codigo_3ac.append(f'{end_temp} = !{end_fat}')
             return end_temp, 'bool'
         else:
-            self.erro_sintatico(
-                f"Fator inválido na expressão: esperado número, ID, bool, ou '('. Encontrado {self.token.valor}")
+            self.erro_sintatico(f"Fator inválido na expressão: esperado número, ID, bool, ou '('. Encontrado {self.token.valor}")
 
     @rastrear("comando 'if'")
     def comando_if(self):
@@ -528,25 +485,18 @@ class AnalisadorSemantico:
         self.match('DELIM', '(')
         end_cond, tipo_cond = self.expressao()
         self.match('DELIM', ')')
-
         if tipo_cond != 'bool':
             self.erro_semantico(f"A condição da instrução 'if' deve ser do tipo booleano, encontrado '{tipo_cond}'.")
-
         label_else = self.novo_label()
-
         self.codigo_3ac.append(f'if_false {end_cond} goto {label_else}')
-
         return_if = self.comando()
-
         if self.token.tipo == 'ELSE':
             label_fim = self.novo_label()
             self.codigo_3ac.append(f'goto {label_fim}')
             self.codigo_3ac.append(f'{label_else}:')
             self.match('ELSE')
-
             return_else = self.comando()
             self.codigo_3ac.append(f'{label_fim}:')
-
             return return_if and return_else
         else:
             self.codigo_3ac.append(f'{label_else}:')
@@ -556,26 +506,18 @@ class AnalisadorSemantico:
     def comando_while(self):
         label_inicio = self.novo_label()
         label_fim = self.novo_label()
-
         self.loop_labels_stack.append({'inicio': label_inicio, 'fim': label_fim})
-
         self.codigo_3ac.append(f'{label_inicio}:')
-
         self.match('WHILE')
         self.match('DELIM', '(')
         end_cond, tipo_cond = self.expressao()
         self.match('DELIM', ')')
-
         if tipo_cond != 'bool':
             self.erro_semantico(f"A condição da instrução 'while' deve ser do tipo booleano, encontrado '{tipo_cond}'.")
-
         self.codigo_3ac.append(f'if_false {end_cond} goto {label_fim}')
-
         self.comando()
-
         self.codigo_3ac.append(f'goto {label_inicio}')
         self.codigo_3ac.append(f'{label_fim}:')
-
         self.loop_labels_stack.pop()
 
     @rastrear("break")
@@ -613,45 +555,36 @@ class AnalisadorSemantico:
     def gerar_grafo_dependencias(self):
         nodes_com_aresta = set()
         todas_as_arestas = []
-
         for f, chamadas in self.dependencias_funcao.items():
             for c in chamadas:
                 todas_as_arestas.append(f'  "{f}" -> "{c}" [label="chama", color=black, style=solid];')
                 nodes_com_aresta.add(f)
                 nodes_com_aresta.add(c)
-
         for f, vars_escritas in self.escrita_variaveis.items():
             for v in vars_escritas:
                 nome_completo = f"{f}_{v}"
-                todas_as_arestas.append(
-                    f'  "{f}" -> "{nome_completo}" [label="escreve", fontcolor=blue, color=blue, style=solid, arrowhead=vee];')
+                todas_as_arestas.append(f'  "{f}" -> "{nome_completo}" [label="escreve", fontcolor=blue, color=blue, style=solid, arrowhead=vee];')
                 nodes_com_aresta.add(f)
                 nodes_com_aresta.add(nome_completo)
-
         for v, funcoes_que_leem in self.leitura_variaveis.items():
             for f in funcoes_que_leem:
                 nome_completo = f"{f}_{v}"
-                todas_as_arestas.append(
-                    f'  "{nome_completo}" -> "{f}" [label="lê", fontcolor=red, color=red, style=dashed, arrowhead=vee];')
+                todas_as_arestas.append(f'  "{nome_completo}" -> "{f}" [label="lê", fontcolor=red, color=red, style=dashed, arrowhead=vee];')
                 nodes_com_aresta.add(f)
                 nodes_com_aresta.add(nome_completo)
-
         linhas = ["digraph Dependencias {"]
         linhas.append("  node [shape=box, style=filled, fillcolor=lightblue];")
-
         for s in self.tabela_simbolos:
             nome_identificador = s['identificador']
             if s.get('params') is not None:
                 if nome_identificador in nodes_com_aresta:
-                    linhas.append(
-                        f'  "{nome_identificador}" [shape=ellipse, style=filled, fillcolor=lightgray, color=black];')
+                    linhas.append(f'  "{nome_identificador}" [shape=ellipse, style=filled, fillcolor=lightgray, color=black];')
             else:
                 nome_completo = f"{s['escopo']}_{s['identificador']}" if s['escopo'] != 'global' else s['identificador']
                 if nome_completo in nodes_com_aresta:
                     linhas.append(f'  "{nome_completo}" [shape=box, style=filled, fillcolor=white, color=black];')
                 elif nome_identificador in nodes_com_aresta:
                     linhas.append(f'  "{nome_identificador}" [shape=box, style=filled, fillcolor=white, color=black];')
-
         linhas.extend(todas_as_arestas)
         linhas.append("}")
         return "\n".join(linhas)
