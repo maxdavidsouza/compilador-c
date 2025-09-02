@@ -16,18 +16,16 @@ class Otimizador:
                 return tabela_simbolos.get(operando, operando)
 
     def _avaliar_expressao(self, v1, op, v2):
-        if isinstance(v1, (int, float)) and isinstance(v2, (int, float)):
-            if op == '+': return v1 + v2
-            if op == '-': return v1 - v2
-            if op == '*': return v1 * v2
-            if op == '/':
-                if v2 != 0:
-                    return v1 / v2
-                else:
-                    return None
-            if op == '==': return int(v1 == v2)
-            if op == '>': return int(v1 > v2)
-            if op == '<': return int(v1 < v2)
+        if op == '+':
+            return v1 + v2
+        if op == '-':
+            return v1 - v2
+        if op == '*':
+            return v1 * v2
+        if op == '/':
+            if v2 != 0:
+                return v1 / v2
+            return None
         return None
 
     def _analisar_funcoes(self):
@@ -61,19 +59,12 @@ class Otimizador:
 
             instrucao = partes[0]
 
-            # 1. Propagação de cópias: substitui a cópia pelo nome original
-            novas_partes = []
-            for parte in partes:
-                if parte in tabela_copias:
-                    novas_partes.append(tabela_copias[parte])
-                else:
-                    novas_partes.append(parte)
+            novas_partes = [tabela_copias.get(p, p) for p in partes]
             partes = novas_partes
 
-            # 2. Inlining de Funções Simples
-            if instrucao == 'call' and len(partes) >= 3:
-                nome_funcao = partes[1]
-                dest = partes[2]
+            if len(partes) >= 3 and partes[1] == '=' and partes[2] == 'call':
+                dest = partes[0]
+                nome_funcao = partes[3]
                 if nome_funcao in self.funcoes:
                     func_code = self.funcoes[nome_funcao]
                     for func_line in func_code:
@@ -89,10 +80,12 @@ class Otimizador:
                 else:
                     codigo_novo.append(" ".join(partes))
 
-            # 3. Dobramento de Constantes e Propagação
+            elif instrucao == 'call':
+                codigo_novo.append(" ".join(partes))
+
             elif len(partes) >= 3 and partes[1] == '=':
                 dest = partes[0]
-                if len(partes) == 3:  # Atribuição simples: a = 5 ou a = b
+                if len(partes) == 3:
                     fonte = partes[2]
                     valor_fonte = self._obter_valor(fonte, tabela_constantes)
                     if isinstance(valor_fonte, (int, float)):
@@ -101,27 +94,26 @@ class Otimizador:
                     else:
                         tabela_copias[dest] = fonte
                         codigo_novo.append(" ".join(partes))
-                elif len(partes) == 5:  # Expressão: t3 = a < 5
+                elif len(partes) == 5:
                     op1_str, op, op2_str = partes[2], partes[3], partes[4]
-                    v1 = tabela_constantes.get(op1_str, op1_str)
-                    v2 = tabela_constantes.get(op2_str, op2_str)
+                    v1 = self._obter_valor(op1_str, tabela_constantes)
+                    v2 = self._obter_valor(op2_str, tabela_constantes)
 
-                    resultado = self._avaliar_expressao(v1, op, v2)
-
-                    if isinstance(resultado, (int, float)):
-                        tabela_constantes[dest] = resultado
-                        codigo_novo.append(f"{dest} = {resultado}")
+                    if isinstance(v1, (int, float)) and isinstance(v2, (int, float)):
+                        resultado = self._avaliar_expressao(v1, op, v2)
+                        if resultado is not None:
+                            tabela_constantes[dest] = resultado
+                            codigo_novo.append(f"{dest} = {resultado}")
+                        else:
+                            codigo_novo.append(" ".join(partes))
                     else:
                         codigo_novo.append(" ".join(partes))
-
-            # 4. Propagação para outros comandos
             else:
                 for i, parte in enumerate(partes):
                     valor = tabela_constantes.get(parte, parte)
                     if isinstance(valor, (int, float)):
                         partes[i] = str(valor)
                 codigo_novo.append(" ".join(partes))
-
         return codigo_novo
 
     def _passagem_eliminacao_codigo_morto(self, codigo):
@@ -153,9 +145,14 @@ class Otimizador:
                 if dest not in variaveis_vivas:
                     continue
 
-            elif instrucao in ['print', 'param', 'return', 'if_false', 'goto', 'call']:
+            elif instrucao in ['print', 'param', 'return', 'if_false', 'goto']:
                 usadas_nesta_linha.update(
                     p for p in partes[1:] if p and not p.isdigit() and not (p.startswith('L') and p[1:].isdigit())
+                )
+            elif instrucao == 'call':
+                usadas_nesta_linha.update(
+                    p for p in partes[1:] if
+                    p and not p.isdigit() and not (p.startswith('L') and p[1:].isdigit()) and not p.isdigit()
                 )
 
             if dest is not None:
