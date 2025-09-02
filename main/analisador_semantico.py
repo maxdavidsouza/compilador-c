@@ -331,32 +331,26 @@ class AnalisadorSemantico:
 
         self.match('DELIM', '(')
 
-        tipos_argumentos = []
+        enderecos_argumentos = []
         if not (self.token.tipo == 'DELIM' and self.token.valor == ')'):
-            tipos_argumentos = self.lista_argumentos()
+            enderecos_argumentos = self.lista_argumentos()
 
-        for end_arg in tipos_argumentos:
+        for end_arg in enderecos_argumentos:
             self.codigo_3ac.append(f'param {end_arg}')
 
         params_esperados = funcao_simbolo.get('params', [])
-        if len(tipos_argumentos) != len(params_esperados):
+        if len(enderecos_argumentos) != len(params_esperados):
             self.erro_semantico(
-                f"Função '{id_token.valor}' espera {len(params_esperados)} argumentos, mas recebeu {len(tipos_argumentos)}.")
-
-        for i, (end_arg, arg_tipo) in enumerate(zip(tipos_argumentos, [p['tipo'] for p in params_esperados])):
-            param_tipo = params_esperados[i]['tipo']
-            if arg_tipo != param_tipo:
-                self.erro_semantico(
-                    f"Argumento {i + 1} da chamada da função '{id_token.valor}': esperado tipo '{param_tipo}', mas recebeu '{arg_tipo}'.")
+                f"Função '{id_token.valor}' espera {len(params_esperados)} argumentos, mas recebeu {len(enderecos_argumentos)}.")
 
         self.match('DELIM', ')')
 
         end_retorno = None
         if funcao_simbolo['tipo'] != 'void':
             end_retorno = self.novo_temp()
-            self.codigo_3ac.append(f'call {id_token.valor}, {end_retorno}')
+            self.codigo_3ac.append(f'{end_retorno} = call {id_token.valor}, {len(enderecos_argumentos)}')
         else:
-            self.codigo_3ac.append(f'call {id_token.valor}')
+            self.codigo_3ac.append(f'call {id_token.valor}, {len(enderecos_argumentos)}')
 
         if self.escopo_atual != 'global':
             self.dependencias_funcao[self.escopo_atual].add(id_token.valor)
