@@ -1,4 +1,4 @@
-# Analisadores Léxico e Sintático para Linguagem baseada em C
+# Compilador de Linguagem baseada em C com Aproximação Didática
 
 **Disciplina:** Compiladores  
 **Curso:** BCC  
@@ -193,10 +193,11 @@ streamlit run app.py
 
 ## Imagens de execução do Projeto usando um Código Simples
 
-<img width="746" height="638" alt="g1" src="https://github.com/user-attachments/assets/30279400-b1d4-4f6a-8d2c-d38ed68da45d" />
-<img width="494" height="1049" alt="g2" src="https://github.com/user-attachments/assets/f0cac90c-585c-4f10-9146-0bbebd4322fe" />
-<img width="353" height="1047" alt="g3" src="https://github.com/user-attachments/assets/9873d0e3-263e-425f-af64-c37307d4d53a" />
-<img width="739" height="965" alt="g4" src="https://github.com/user-attachments/assets/86f9e0bd-788c-4f55-862b-0bf0e01d7393" />
-<img width="732" height="657" alt="g5" src="https://github.com/user-attachments/assets/f0711dd2-9ccd-47fc-a781-de4b3d5b93b9" />
-<img width="728" height="812" alt="g6" src="https://github.com/user-attachments/assets/ddd7a132-558e-412e-831e-bc168195086f" />
-<img width="730" height="620" alt="g7" src="https://github.com/user-attachments/assets/3e637721-8b87-487b-98a2-4f8b32672154" />
+<img width="750" height="930" alt="e-1" src="https://github.com/user-attachments/assets/a5aa6e74-3bf6-4bb9-ab2e-54077761988e" />
+<img width="526" height="1043" alt="e-2" src="https://github.com/user-attachments/assets/c9bfe8e6-8406-4770-8b48-2c385c7b914d" />
+<img width="344" height="799" alt="e-3" src="https://github.com/user-attachments/assets/cd662456-dc06-460c-91fe-3a5350b97de9" />
+<img width="723" height="1066" alt="e-4" src="https://github.com/user-attachments/assets/a31a8f07-9bfc-455d-b0a0-076cc3ee9c29" />
+<img width="738" height="583" alt="e-5" src="https://github.com/user-attachments/assets/d3565f3b-3b0a-4c7b-b1e2-0aca3b69a347" />
+<img width="728" height="938" alt="e-6" src="https://github.com/user-attachments/assets/7205414b-8889-4c80-8fb0-b200eaa432d9" />
+<img width="735" height="719" alt="e-7" src="https://github.com/user-attachments/assets/1dbfc49d-99d6-4c00-abab-2dabe47fd666" />
+
